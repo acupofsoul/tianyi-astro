@@ -1,8 +1,24 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --cosmic-dark: #050a14;
+  --cosmic-deep: #0a1528;
+  --cosmic-medium: #102040;
+  --cosmic-accent: #2a4a7a;
+  --star-gold: #ffd700;
+  --star-blue: #6495ed;
+  --nebula-purple: #9370db;
+  --nebula-pink: #ff69b4;
+  --nebula-teal: #00ced1;
+  --accent-orange: #ff6b35;
+  --accent-cyan: #00d4ff;
+  --glow-primary: rgba(0, 212, 255, 0.4);
+  --glow-secondary: rgba(255, 107, 53, 0.3);
+}
 
 body {
   margin: 0;
@@ -12,12 +28,38 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #0b1a2b;
+  background: linear-gradient(135deg, var(--cosmic-dark) 0%, var(--cosmic-deep) 50%, var(--cosmic-medium) 100%);
   color: white;
+  overflow-x: hidden;
+  background-attachment: fixed;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(2px 2px at 20% 30%, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 60% 70%, rgba(100, 149, 237, 0.6), transparent),
+    radial-gradient(2px 2px at 80% 20%, rgba(255, 215, 0, 0.4), transparent),
+    radial-gradient(1px 1px at 40% 80%, rgba(147, 112, 219, 0.5), transparent);
+  background-size: 200% 200%;
+  animation: starTwinkle 10s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes starTwinkle {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0.05em;
 }
 
 code {
@@ -27,4 +69,153 @@ code {
 
 * {
   box-sizing: border-box;
+}
+
+/* 玻璃态效果 */
+.glass-effect {
+  background: rgba(10, 21, 40, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(100, 149, 237, 0.2);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* 霓虹发光效果 */
+.neon-glow {
+  box-shadow: 
+    0 0 10px var(--glow-primary),
+    0 0 20px var(--glow-primary),
+    0 0 40px var(--glow-primary);
+}
+
+/* 按钮悬停效果 */
+.btn-glow {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-glow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.btn-glow:hover::before {
+  left: 100%;
+}
+
+.btn-glow:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px var(--glow-primary);
+}
+
+/* 卡片悬停效果 */
+.card-hover {
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.card-hover:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.5),
+    0 0 60px var(--glow-primary);
+}
+
+/* 文本发光效果 */
+.text-glow {
+  text-shadow: 
+    0 0 10px var(--glow-primary),
+    0 0 20px var(--glow-primary),
+    0 0 30px var(--glow-primary);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cosmic-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--accent-cyan), var(--nebula-purple));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--accent-orange), var(--star-gold));
+}
+
+/* 动画类 */
+.fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.slide-in-left {
+  animation: slideInLeft 0.6s ease-out forwards;
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.slide-in-right {
+  animation: slideInRight 0.6s ease-out forwards;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 10px var(--glow-primary); }
+  50% { box-shadow: 0 0 30px var(--glow-primary), 0 0 60px var(--glow-primary); }
+}
+
+.float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-15px); }
+}
+
+/* 星云渐变背景 */
+.nebula-bg {
+  background: 
+    radial-gradient(ellipse at 20% 80%, rgba(147, 112, 219, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(0, 206, 209, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(255, 105, 180, 0.08) 0%, transparent 60%),
+    linear-gradient(135deg, var(--cosmic-dark) 0%, var(--cosmic-deep) 50%, var(--cosmic-medium) 100%);
+}
+
+/* 边框渐变 */
+.border-gradient {
+  position: relative;
+  border: double 2px transparent;
+  background-image: linear-gradient(var(--cosmic-deep), var(--cosmic-deep)), 
+                    linear-gradient(135deg, var(--accent-cyan), var(--nebula-purple), var(--accent-orange));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
 }

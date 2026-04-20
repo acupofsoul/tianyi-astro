@@ -10,19 +10,26 @@ const Learning = lazy(() => import('./pages/Learning'))
 
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen">
       <Navbar />
-      <div className="container mx-auto px-4 py-8">
-        <Suspense fallback={<div className="flex justify-center items-center h-64">加载中...</div>}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/wonders" element={<Wonders />} />
-            <Route path="/galaxies" element={<Galaxies />} />
-            <Route path="/learning" element={<Learning />} />
-            <Route path="/about" element={<About />} />
-          </Routes>
-        </Suspense>
-      </div>
+      <Suspense 
+        fallback={
+          <div className="min-h-screen nebula-bg flex justify-center items-center pt-20">
+            <div className="glass-effect rounded-2xl p-8 border-gradient text-center">
+              <div className="text-6xl mb-4 animate-pulse">🚀</div>
+              <p className="text-xl text-gray-300">正在加载宇宙探索...</p>
+            </div>
+          </div>
+        }
+      >
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/wonders" element={<Wonders />} />
+          <Route path="/galaxies" element={<Galaxies />} />
+          <Route path="/learning" element={<Learning />} />
+          <Route path="/about" element={<About />} />
+        </Routes>
+      </Suspense>
     </div>
   )
 }
