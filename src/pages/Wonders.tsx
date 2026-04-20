@@ -76,41 +76,45 @@ const BlackHoleSimulator = () => {
     let animationId: number
     let time = 0
 
-    const stars = Array(200).fill(0).map(() => ({
+    const stars = Array(300).fill(0).map(() => ({
       x: Math.random(),
       y: Math.random(),
-      size: Math.random() * 2 + 0.5,
-      twinkleSpeed: Math.random() * 0.03 + 0.01
+      size: Math.random() * 1.5 + 0.3,
+      twinkleSpeed: Math.random() * 0.04 + 0.005,
+      brightness: Math.random() * 0.5 + 0.5
     }))
 
     const draw = () => {
       const centerX = canvas.width / 2
       const centerY = canvas.height / 2
-      const blackHoleRadius = 60
+      const blackHoleRadius = 70
 
-      ctx.fillStyle = '#050a14'
+      // 深空背景
+      ctx.fillStyle = '#02040a'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      const gradient1 = ctx.createRadialGradient(
-        canvas.width * 0.2, canvas.height * 0.8, 0,
-        canvas.width * 0.2, canvas.height * 0.8, 200
+      // 深空光晕
+      const deepSpaceGradient = ctx.createRadialGradient(
+        canvas.width * 0.3, canvas.height * 0.2, 0,
+        canvas.width * 0.3, canvas.height * 0.2, 300
       )
-      gradient1.addColorStop(0, 'rgba(147, 112, 219, 0.08)')
-      gradient1.addColorStop(1, 'transparent')
-      ctx.fillStyle = gradient1
+      deepSpaceGradient.addColorStop(0, 'rgba(30, 40, 80, 0.15)')
+      deepSpaceGradient.addColorStop(1, 'transparent')
+      ctx.fillStyle = deepSpaceGradient
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
-      const gradient2 = ctx.createRadialGradient(
-        centerX, centerY, 0,
-        centerX, centerY, blackHoleRadius * 8
+      const deepSpaceGradient2 = ctx.createRadialGradient(
+        canvas.width * 0.7, canvas.height * 0.7, 0,
+        canvas.width * 0.7, canvas.height * 0.7, 250
       )
-      gradient2.addColorStop(0, 'rgba(0, 212, 255, 0.05)')
-      gradient2.addColorStop(1, 'transparent')
-      ctx.fillStyle = gradient2
+      deepSpaceGradient2.addColorStop(0, 'rgba(60, 30, 80, 0.12)')
+      deepSpaceGradient2.addColorStop(1, 'transparent')
+      ctx.fillStyle = deepSpaceGradient2
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
+      // 绘制背景星星并应用引力透镜效应
       stars.forEach((star, i) => {
-        const twinkle = Math.sin(time * star.twinkleSpeed + i) * 0.3 + 0.7
+        const twinkle = Math.sin(time * star.twinkleSpeed + i) * 0.2 + 0.8
         const x = star.x * canvas.width
         const y = star.y * canvas.height
         
@@ -118,43 +122,79 @@ const BlackHoleSimulator = () => {
         const dy = y - centerY
         const dist = Math.sqrt(dx * dx + dy * dy)
         
-        if (dist > blackHoleRadius * 2) {
-          const lensEffect = Math.min(30 / (dist / 100 + 1), 20)
-          const lensX = x + (dx / dist) * lensEffect
-          const lensY = y + (dy / dist) * lensEffect
+        if (dist > blackHoleRadius * 1.5) {
+          // 更强的引力透镜效应，模拟《星际穿越》中的效果
+          const lensStrength = 80 / (dist / 80 + 1)
+          const lensX = x + (dx / dist) * lensStrength * 0.6
+          const lensY = y + (dy / dist) * lensStrength * 0.6
+          
+          // 星星亮度随距离黑洞远近变化
+          const distanceFactor = Math.min(1, (dist - blackHoleRadius * 1.5) / 200)
+          const starColor = star.brightness > 0.7 ? '255, 255, 255' : 
+                             star.brightness > 0.5 ? '200, 220, 255' : '255, 230, 200'
           
           ctx.beginPath()
           ctx.arc(lensX, lensY, star.size * twinkle, 0, Math.PI * 2)
-          ctx.fillStyle = `rgba(255, 255, 255, ${twinkle * 0.8})`
+          ctx.fillStyle = `rgba(${starColor}, ${twinkle * 0.9 * distanceFactor})`
           ctx.fill()
         }
       })
 
-      const diskRotation = time * 0.005 * speed
+      const diskRotation = time * 0.008 * speed
       
-      for (let layer = 0; layer < 12; layer++) {
-        const diskRadius = 90 + layer * 15
-        const diskThickness = 8 + layer * 2
+      // 绘制爱因斯坦环 - 这是黑洞最典型的视觉特征
+      for (let ring = 0; ring < 3; ring++) {
+        const ringRadius = blackHoleRadius * 2.5 + ring * 8
+        const ringOpacity = 0.15 - ring * 0.04
+        
+        ctx.save()
+        ctx.translate(centerX, centerY)
+        ctx.rotate(diskRotation * 0.3)
+        
+        const ringGradient = ctx.createRadialGradient(0, 0, ringRadius - 5, 0, 0, ringRadius + 5)
+        ringGradient.addColorStop(0, 'transparent')
+        ringGradient.addColorStop(0.5, `rgba(255, 200, 100, ${ringOpacity * accretionBrightness})`)
+        ringGradient.addColorStop(1, 'transparent')
+        
+        ctx.beginPath()
+        ctx.ellipse(0, 0, ringRadius, ringRadius * 0.12, 0, 0, Math.PI * 2)
+        ctx.fillStyle = ringGradient
+        ctx.fill()
+        
+        ctx.restore()
+      }
+      
+      // 绘制吸积盘 - 基于《星际穿越》中的卡冈图雅黑洞设计
+      for (let layer = 0; layer < 15; layer++) {
+        const diskRadius = 85 + layer * 12
+        const diskThickness = 6 + layer * 1.5
         
         ctx.save()
         ctx.translate(centerX, centerY)
         ctx.rotate(diskRotation)
-        ctx.scale(1, 0.15)
+        ctx.scale(1, 0.12)
         
+        // 多普勒效应：一侧更亮偏蓝，另一侧偏红暗淡
         const diskGradient = ctx.createLinearGradient(-diskRadius, 0, diskRadius, 0)
         
-        const colors = [
-          ['#ff6b6b', '#ff4757', '#ff3742'],
-          ['#ffbe76', '#ffa502', '#ff9f43'],
-          ['#f9ca24', '#feca57', '#ffda79'],
-          ['#7bed9f', '#2ed573', '#1e90ff']
+        // 基于《星际穿越》的颜色方案：橙色、黄色、红色为主
+        const layerColors = [
+          { left: 'rgba(100, 180, 255, ', center: 'rgba(255, 220, 150, ', right: 'rgba(255, 100, 80, ' },
+          { left: 'rgba(80, 150, 220, ', center: 'rgba(255, 200, 100, ', right: 'rgba(220, 80, 60, ' },
+          { left: 'rgba(60, 120, 180, ', center: 'rgba(255, 180, 50, ', right: 'rgba(180, 60, 40, ' },
+          { left: 'rgba(40, 90, 140, ', center: 'rgba(255, 150, 20, ', right: 'rgba(140, 40, 20, ' },
+          { left: 'rgba(20, 60, 100, ', center: 'rgba(220, 120, 0, ', right: 'rgba(100, 20, 10, ' }
         ]
         
-        const colorSet = colors[layer % colors.length]
+        const colorSet = layerColors[layer % layerColors.length]
+        const opacity = Math.max(0.1, 0.9 - layer * 0.05) * accretionBrightness
+        
         diskGradient.addColorStop(0, 'transparent')
-        diskGradient.addColorStop(0.45, `${colorSet[0]}${Math.floor(120 * accretionBrightness).toString(16).padStart(2, '0')}`)
-        diskGradient.addColorStop(0.5, `${colorSet[1]}${Math.floor(200 * accretionBrightness).toString(16).padStart(2, '0')}`)
-        diskGradient.addColorStop(0.55, `${colorSet[2]}${Math.floor(120 * accretionBrightness).toString(16).padStart(2, '0')}`)
+        diskGradient.addColorStop(0.3, `${colorSet.left}${Math.floor(opacity * 180).toString(16).padStart(2, '0')})`)
+        diskGradient.addColorStop(0.45, `${colorSet.center}${Math.floor(opacity * 255).toString(16).padStart(2, '0')})`)
+        diskGradient.addColorStop(0.5, `${colorSet.center}${Math.floor(opacity * 255).toString(16).padStart(2, '0')})`)
+        diskGradient.addColorStop(0.55, `${colorSet.right}${Math.floor(opacity * 220).toString(16).padStart(2, '0')})`)
+        diskGradient.addColorStop(0.7, `${colorSet.right}${Math.floor(opacity * 120).toString(16).padStart(2, '0')})`)
         diskGradient.addColorStop(1, 'transparent')
         
         ctx.beginPath()
@@ -165,79 +205,112 @@ const BlackHoleSimulator = () => {
         ctx.restore()
       }
 
-      for (let i = 0; i < 80; i++) {
-        const angle = (i / 80) * Math.PI * 2 + time * 0.03 * speed
-        const distance = 80 + Math.sin(i * 0.3 + time * 0.15) * 30
+      // 绘制吸积盘的背面影像（引力透镜效应）
+      ctx.save()
+      ctx.translate(centerX, centerY)
+      ctx.rotate(diskRotation * 0.5)
+      ctx.scale(1, 0.08)
+      
+      const backDiskGradient = ctx.createLinearGradient(-180, 0, 180, 0)
+      backDiskGradient.addColorStop(0, 'transparent')
+      backDiskGradient.addColorStop(0.3, `rgba(80, 120, 180, ${0.3 * accretionBrightness})`)
+      backDiskGradient.addColorStop(0.5, `rgba(180, 140, 100, ${0.5 * accretionBrightness})`)
+      backDiskGradient.addColorStop(0.7, `rgba(150, 80, 60, ${0.3 * accretionBrightness})`)
+      backDiskGradient.addColorStop(1, 'transparent')
+      
+      ctx.beginPath()
+      ctx.ellipse(0, 0, 180, 25, 0, 0, Math.PI * 2)
+      ctx.fillStyle = backDiskGradient
+      ctx.fill()
+      
+      ctx.restore()
+
+      // 绘制发光的粒子和能量流
+      for (let i = 0; i < 100; i++) {
+        const angle = (i / 100) * Math.PI * 2 + time * 0.04 * speed
+        const distance = 75 + Math.sin(i * 0.25 + time * 0.12) * 25
         const x = Math.cos(angle) * distance
-        const y = Math.sin(angle) * distance * 0.15
+        const y = Math.sin(angle) * distance * 0.12
         
         ctx.save()
         ctx.translate(centerX, centerY)
         ctx.rotate(diskRotation)
         
-        const particleGradient = ctx.createRadialGradient(x, y, 0, x, y, 8)
-        particleGradient.addColorStop(0, `rgba(255, 255, 255, ${0.9 * accretionBrightness})`)
-        particleGradient.addColorStop(0.5, `rgba(255, 193, 7, ${0.6 * accretionBrightness})`)
+        // 根据位置不同，粒子颜色也不同，模拟多普勒效应
+        const particleColor = x > 0 ? 
+          `rgba(200, 220, 255, ${0.7 * accretionBrightness})` : 
+          `rgba(255, 180, 150, ${0.5 * accretionBrightness})`
+        
+        const particleGradient = ctx.createRadialGradient(x, y, 0, x, y, 6)
+        particleGradient.addColorStop(0, `rgba(255, 255, 255, ${0.8 * accretionBrightness})`)
+        particleGradient.addColorStop(0.4, particleColor)
         particleGradient.addColorStop(1, 'transparent')
         
         ctx.beginPath()
-        ctx.arc(x, y, 8, 0, Math.PI * 2)
+        ctx.arc(x, y, 6, 0, Math.PI * 2)
         ctx.fillStyle = particleGradient
         ctx.fill()
         
         ctx.restore()
       }
 
+      // 黑洞日冕
       const coronaGradient = ctx.createRadialGradient(
         centerX, centerY, blackHoleRadius,
-        centerX, centerY, blackHoleRadius * 3.5
+        centerX, centerY, blackHoleRadius * 3
       )
-      coronaGradient.addColorStop(0, 'rgba(255, 193, 7, 0.2)')
-      coronaGradient.addColorStop(0.3, 'rgba(255, 87, 34, 0.1)')
+      coronaGradient.addColorStop(0, 'rgba(255, 200, 100, 0.15)')
+      coronaGradient.addColorStop(0.2, 'rgba(255, 150, 50, 0.1)')
+      coronaGradient.addColorStop(0.5, 'rgba(150, 80, 30, 0.05)')
       coronaGradient.addColorStop(1, 'transparent')
       ctx.beginPath()
-      ctx.arc(centerX, centerY, blackHoleRadius * 3.5, 0, Math.PI * 2)
+      ctx.arc(centerX, centerY, blackHoleRadius * 3, 0, Math.PI * 2)
       ctx.fillStyle = coronaGradient
       ctx.fill()
 
+      // 黑洞本体 - 事件视界
       const blackHoleGradient = ctx.createRadialGradient(
         centerX, centerY, 0,
         centerX, centerY, blackHoleRadius
       )
       blackHoleGradient.addColorStop(0, '#000000')
-      blackHoleGradient.addColorStop(0.8, '#000000')
-      blackHoleGradient.addColorStop(1, '#1a1a2e')
+      blackHoleGradient.addColorStop(0.9, '#000000')
+      blackHoleGradient.addColorStop(1, '#1a1510')
       
       ctx.beginPath()
       ctx.arc(centerX, centerY, blackHoleRadius, 0, Math.PI * 2)
       ctx.fillStyle = blackHoleGradient
       ctx.fill()
 
+      // 黑洞阴影
       ctx.shadowColor = '#000000'
-      ctx.shadowBlur = 80
+      ctx.shadowBlur = 100
       ctx.beginPath()
       ctx.arc(centerX, centerY, blackHoleRadius, 0, Math.PI * 2)
       ctx.fill()
       ctx.shadowBlur = 0
 
-      for (let i = 0; i < 8; i++) {
-        const jetOffset = (i - 3.5) * 8
-        const jetLength = 200 + Math.sin(time * 0.1 + i) * 60
+      // 相对论性喷流 - 更加精细的效果
+      for (let i = 0; i < 10; i++) {
+        const jetOffset = (i - 4.5) * 6
+        const jetLength = 220 + Math.sin(time * 0.08 + i * 0.5) * 50
         
         ctx.save()
         ctx.translate(centerX, centerY)
-        ctx.rotate(diskRotation)
+        ctx.rotate(diskRotation * 0.2)
         
         const jetGradient = ctx.createLinearGradient(0, 0, 0, jetLength * (i % 2 === 0 ? -1 : 1))
-        jetGradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)')
-        jetGradient.addColorStop(0.3, 'rgba(255, 193, 7, 0.7)')
-        jetGradient.addColorStop(0.7, 'rgba(255, 87, 34, 0.4)')
+        jetGradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)')
+        jetGradient.addColorStop(0.2, 'rgba(200, 220, 255, 0.8)')
+        jetGradient.addColorStop(0.4, 'rgba(150, 180, 255, 0.6)')
+        jetGradient.addColorStop(0.6, 'rgba(100, 140, 200, 0.4)')
+        jetGradient.addColorStop(0.8, 'rgba(60, 80, 120, 0.2)')
         jetGradient.addColorStop(1, 'transparent')
         
         ctx.beginPath()
-        ctx.moveTo(jetOffset * 0.2, 0)
-        ctx.lineTo(jetOffset * 0.15 + 10, (i % 2 === 0 ? -1 : 1) * jetLength)
-        ctx.lineTo(jetOffset * 0.15 - 10, (i % 2 === 0 ? -1 : 1) * jetLength)
+        ctx.moveTo(jetOffset * 0.15, 0)
+        ctx.lineTo(jetOffset * 0.1 + 8, (i % 2 === 0 ? -1 : 1) * jetLength)
+        ctx.lineTo(jetOffset * 0.1 - 8, (i % 2 === 0 ? -1 : 1) * jetLength)
         ctx.closePath()
         ctx.fillStyle = jetGradient
         ctx.fill()

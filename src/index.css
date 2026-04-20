@@ -5,22 +5,28 @@
 @tailwind utilities;
 
 :root {
-  --interstellar-black: #0a0a0a;
-  --interstellar-deep: #12121e;
-  --interstellar-blue: #1e3a4a;
+  --interstellar-black: #02040a;
+  --interstellar-deep: #0a0a1a;
+  --interstellar-blue: #1e2a3a;
   --interstellar-cyan: #00d4ff;
   --interstellar-blue-accent: #00a3cc;
   --interstellar-purple: #4a00e0;
   --interstellar-pink: #ff4081;
+  --interstellar-orange: #ff6600;
+  --interstellar-yellow: #ffcc00;
+  --interstellar-red: #ff3333;
+  --interstellar-warm-orange: #ff9500;
   --interstellar-gold: #ffd700;
   --interstellar-white: #ffffff;
-  --interstellar-gray: #b0bec5;
+  --interstellar-gray: #8a8a9a;
+  --interstellar-light: #e0e0ff;
   --hud-green: #4caf50;
   --hud-yellow: #ffeb3b;
   --hud-red: #f44336;
   --glow-interstellar: rgba(0, 212, 255, 0.6);
   --glow-nebula: rgba(74, 0, 224, 0.4);
-  --glow-warm: rgba(255, 64, 129, 0.3);
+  --glow-warm: rgba(255, 150, 50, 0.4);
+  --glow-accretion: rgba(255, 200, 100, 0.5);
 }
 
 body {
@@ -32,10 +38,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background: 
-    radial-gradient(ellipse at 20% 80%, rgba(74, 0, 224, 0.1) 0%, transparent 60%),
-    radial-gradient(ellipse at 80% 20%, rgba(0, 212, 255, 0.08) 0%, transparent 60%),
-    radial-gradient(ellipse at 50% 50%, rgba(255, 64, 129, 0.05) 0%, transparent 70%),
-    linear-gradient(135deg, var(--interstellar-black) 0%, var(--interstellar-deep) 40%, var(--interstellar-blue) 100%);
+    radial-gradient(ellipse at 20% 80%, rgba(60, 30, 80, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 20%, rgba(30, 40, 80, 0.15) 0%, transparent 60%),
+    radial-gradient(ellipse at 50% 50%, rgba(80, 40, 20, 0.1) 0%, transparent 70%),
+    linear-gradient(135deg, var(--interstellar-black) 0%, var(--interstellar-deep) 40%, #050a14 100%);
   color: var(--interstellar-white);
   overflow-x: hidden;
   background-attachment: fixed;
