@@ -159,15 +159,6 @@ const SolarSystemCanvas: React.FC = () => {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const resizeCanvas = () => {
-      canvas.width = Math.min(window.innerWidth * 0.95, 1400)
-      canvas.height = Math.min(window.innerHeight * 0.85, 900)
-      updateStarCanvas()
-    }
-
-    resizeCanvas()
-    window.addEventListener('resize', resizeCanvas)
-
     let animationId: number
     const startTime = Date.now()
     let lastFrameTime = 0
@@ -221,6 +212,12 @@ const SolarSystemCanvas: React.FC = () => {
       gradient3.addColorStop(1, 'transparent')
       starCtx.fillStyle = gradient3
       starCtx.fillRect(0, 0, starCanvas.width, starCanvas.height)
+    }
+
+    const resizeCanvas = () => {
+      canvas.width = Math.min(window.innerWidth * 0.95, 1400)
+      canvas.height = Math.min(window.innerHeight * 0.85, 900)
+      updateStarCanvas()
     }
 
     updateStarCanvas()
@@ -296,27 +293,27 @@ const SolarSystemCanvas: React.FC = () => {
     }
 
     const drawPlanet = (planet: Planet, angle: number, centerX: number, centerY: number, _time: number) => {
-    const x = centerX + Math.cos(angle) * planet.distance * viewState.scale
-    const y = centerY + Math.sin(angle) * planet.distance * viewState.scale
-    const radius = planet.radius * viewState.scale
+      const x = centerX + Math.cos(angle) * planet.distance * viewState.scale
+      const y = centerY + Math.sin(angle) * planet.distance * viewState.scale
+      const radius = planet.radius * viewState.scale
 
-    const glowGradient = ctx.createRadialGradient(x, y, radius, x, y, radius * 2.5)
-    glowGradient.addColorStop(0, `${planet.glowColor}40`)
-    glowGradient.addColorStop(1, 'transparent')
-    ctx.beginPath()
-    ctx.arc(x, y, radius * 2.5, 0, Math.PI * 2)
-    ctx.fillStyle = glowGradient
-    ctx.fill()
+      const glowGradient = ctx.createRadialGradient(x, y, radius, x, y, radius * 2.5)
+      glowGradient.addColorStop(0, `${planet.glowColor}40`)
+      glowGradient.addColorStop(1, 'transparent')
+      ctx.beginPath()
+      ctx.arc(x, y, radius * 2.5, 0, Math.PI * 2)
+      ctx.fillStyle = glowGradient
+      ctx.fill()
 
-    if (planet.textureGradient) {
-      const planetGradient = ctx.createRadialGradient(
-        x - radius * 0.3, y - radius * 0.3, 0,
-        x, y, radius
-      )
-      planet.textureGradient.forEach((color, i) => {
-        const len = planet.textureGradient?.length ?? 1
-        planetGradient.addColorStop(i / Math.max(1, len - 1), color)
-      })
+      if (planet.textureGradient) {
+        const planetGradient = ctx.createRadialGradient(
+          x - radius * 0.3, y - radius * 0.3, 0,
+          x, y, radius
+        )
+        planet.textureGradient.forEach((color, i) => {
+          const len = planet.textureGradient?.length ?? 1
+          planetGradient.addColorStop(i / Math.max(1, len - 1), color)
+        })
         
         ctx.beginPath()
         ctx.arc(x, y, radius, 0, Math.PI * 2)
