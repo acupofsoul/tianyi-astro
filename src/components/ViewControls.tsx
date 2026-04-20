@@ -190,24 +190,24 @@ const ViewControls: React.FC<ViewControlsProps> = ({
       />
       
       {/* 控制按钮 */}
-      <div className="absolute top-4 left-4 flex flex-col gap-2 pointer-events-auto">
+      <div className="absolute bottom-4 left-4 flex flex-col gap-2 pointer-events-auto">
         <button
           onClick={resetView}
-          className="bg-black bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90 transition-all"
+          className="glass-effect border border-cyan-500/30 text-white p-3 rounded-full hover:shadow-lg hover:shadow-cyan-500/30 transition-all btn-glow"
           title="重置视角"
         >
           ⟲
         </button>
         <button
           onClick={() => zoomTo(1.2)}
-          className="bg-black bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90 transition-all"
+          className="glass-effect border border-cyan-500/30 text-white p-3 rounded-full hover:shadow-lg hover:shadow-cyan-500/30 transition-all btn-glow"
           title="放大"
         >
           +
         </button>
         <button
           onClick={() => zoomTo(0.8)}
-          className="bg-black bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90 transition-all"
+          className="glass-effect border border-cyan-500/30 text-white p-3 rounded-full hover:shadow-lg hover:shadow-cyan-500/30 transition-all btn-glow"
           title="缩小"
         >
           −
@@ -215,7 +215,7 @@ const ViewControls: React.FC<ViewControlsProps> = ({
         {enableRotation && (
           <button
             onClick={() => rotateTo(viewState.rotation + Math.PI / 2)}
-            className="bg-black bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90 transition-all"
+            className="glass-effect border border-cyan-500/30 text-white p-3 rounded-full hover:shadow-lg hover:shadow-cyan-500/30 transition-all btn-glow"
             title="旋转"
           >
             ↻
