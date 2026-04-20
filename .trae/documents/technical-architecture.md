@@ -55,7 +55,7 @@ interface Wonder {
   id: string;
   name: string;
   description: string;
-  type: 'blackHole' | 'comet' | 'binaryStar';
+  type: 'blackHole' | 'comet' | 'binaryStar' | 'supernova' | 'nebula' | 'planetRing' | 'meteorShower';
   data: any; // 特定类型的额外数据
 }
 ```
@@ -89,10 +89,16 @@ interface GalaxyFormation {
 - `BlackHoleSimulator`: 黑洞模拟
 - `CometSimulator`: 彗星模拟
 - `BinaryStarSimulator`: 双星系统模拟
+- `SupernovaSimulator`: 超新星爆发模拟
+- `NebulaSimulator`: 星云形成模拟
+- `PlanetRingSimulator`: 行星环系统模拟
+- `MeteorShowerSimulator`: 流星雨模拟
 
 ### 5.3 星系概念组件
 - `GalaxyTypeCard`: 星系类型卡片
 - `GalaxyFormationTimeline`: 星系形成时间轴
+- `GalaxyClusterComponent`: 星系团和超星系团展示
+- `DarkMatterEnergyComponent`: 暗物质和暗能量可视化
 
 ## 6. 性能优化策略
 - 使用 `useRef` 存储Canvas上下文，避免重复获取
