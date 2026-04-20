@@ -190,35 +190,35 @@ const ViewControls: React.FC<ViewControlsProps> = ({
       />
       
       {/* 控制按钮 */}
-      <div className="absolute bottom-4 left-4 flex flex-col gap-2 pointer-events-auto">
+      <div className="absolute bottom-4 left-4 flex flex-col gap-3 pointer-events-auto">
         <button
           onClick={resetView}
-          className="glass-effect border border-cyan-500/30 text-white p-3 rounded-full hover:shadow-lg hover:shadow-cyan-500/30 transition-all btn-glow"
-          title="重置视角"
+          className="interstellar-btn text-interstellar-cyan p-4 rounded-full hover:interstellar-glow transition-all"
+          title="RESET VIEW"
         >
-          ⟲
+          <span className="text-lg">⟲</span>
         </button>
         <button
           onClick={() => zoomTo(1.2)}
-          className="glass-effect border border-cyan-500/30 text-white p-3 rounded-full hover:shadow-lg hover:shadow-cyan-500/30 transition-all btn-glow"
-          title="放大"
+          className="interstellar-btn text-interstellar-cyan p-4 rounded-full hover:interstellar-glow transition-all"
+          title="ZOOM IN"
         >
-          +
+          <span className="text-lg font-bold">+</span>
         </button>
         <button
           onClick={() => zoomTo(0.8)}
-          className="glass-effect border border-cyan-500/30 text-white p-3 rounded-full hover:shadow-lg hover:shadow-cyan-500/30 transition-all btn-glow"
-          title="缩小"
+          className="interstellar-btn text-interstellar-cyan p-4 rounded-full hover:interstellar-glow transition-all"
+          title="ZOOM OUT"
         >
-          −
+          <span className="text-lg font-bold">−</span>
         </button>
         {enableRotation && (
           <button
             onClick={() => rotateTo(viewState.rotation + Math.PI / 2)}
-            className="glass-effect border border-cyan-500/30 text-white p-3 rounded-full hover:shadow-lg hover:shadow-cyan-500/30 transition-all btn-glow"
-            title="旋转"
+            className="interstellar-btn text-interstellar-cyan p-4 rounded-full hover:interstellar-glow transition-all"
+            title="ROTATE"
           >
-            ↻
+            <span className="text-lg">↻</span>
           </button>
         )}
       </div>

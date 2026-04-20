@@ -506,12 +506,12 @@ const SolarSystemCanvas: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-screen nebula-bg flex flex-col items-center justify-center overflow-hidden">
+    <div className="relative w-full h-screen interstellar-bg flex flex-col items-center justify-center overflow-hidden digital-rain">
       <canvas
         ref={canvasRef}
-        className="rounded-2xl shadow-2xl border border-gray-800/50"
+        className="rounded-2xl interstellar-glass interstellar-border"
         style={{ 
-          boxShadow: '0 0 100px rgba(0, 212, 255, 0.1), inset 0 0 60px rgba(0, 0, 0, 0.5)'
+          boxShadow: '0 0 120px rgba(0, 212, 255, 0.2), inset 0 0 80px rgba(0, 0, 0, 0.6)'
         }}
       />
       
@@ -524,56 +524,56 @@ const SolarSystemCanvas: React.FC = () => {
       />
       
       {selectedPlanet && (
-        <div className="absolute top-6 right-6 glass-effect rounded-2xl p-6 max-w-sm fade-in border-gradient">
-          <h3 className="text-2xl font-bold mb-4 text-glow" style={{ color: selectedPlanet.glowColor }}>
-            {selectedPlanet.name}
+        <div className="absolute top-6 right-6 interstellar-glass interstellar-border rounded-2xl p-6 max-w-sm fade-in hud-element">
+          <h3 className="text-2xl font-bold mb-4 interstellar-font interstellar-text-glow" style={{ color: selectedPlanet.glowColor }}>
+            {selectedPlanet.name.toUpperCase()}
           </h3>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-400">相对半径:</span>
-              <span className="text-white font-medium">{selectedPlanet.radius}</span>
+          <div className="space-y-3 text-sm rajdhani-font">
+            <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
+              <span className="text-interstellar-cyan/70">RADIUS:</span>
+              <span className="text-interstellar-white font-medium">{selectedPlanet.radius} UNITS</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">轨道距离:</span>
-              <span className="text-white font-medium">{selectedPlanet.distance} AU</span>
+            <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
+              <span className="text-interstellar-cyan/70">ORBIT DISTANCE:</span>
+              <span className="text-interstellar-white font-medium">{selectedPlanet.distance} AU</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">公转周期:</span>
-              <span className="text-white font-medium">{selectedPlanet.orbitalPeriod} 天</span>
+            <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
+              <span className="text-interstellar-cyan/70">ORBITAL PERIOD:</span>
+              <span className="text-interstellar-white font-medium">{selectedPlanet.orbitalPeriod} DAYS</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">自转周期:</span>
-              <span className="text-white font-medium">{selectedPlanet.rotationPeriod} 天</span>
+            <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
+              <span className="text-interstellar-cyan/70">ROTATION PERIOD:</span>
+              <span className="text-interstellar-white font-medium">{selectedPlanet.rotationPeriod} DAYS</span>
             </div>
           </div>
           <button
             onClick={() => setSelectedPlanet(null)}
-            className="mt-4 w-full py-2 px-4 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 rounded-lg text-cyan-300 hover:from-cyan-500/30 hover:to-purple-500/30 transition-all btn-glow"
+            className="mt-4 w-full py-3 px-4 interstellar-btn text-interstellar-cyan hover:text-interstellar-white transition-all"
           >
-            关闭
+            <span className="interstellar-font text-xs uppercase">CLOSE</span>
           </button>
         </div>
       )}
       
-      <div className="absolute bottom-6 left-6 glass-effect rounded-xl p-4 fade-in">
-        <p className="text-sm text-gray-300 mb-2">🖱️ 拖动: 移动视角</p>
-        <p className="text-sm text-gray-300 mb-2">🔍 滚轮: 缩放</p>
-        <p className="text-sm text-gray-300 mb-2">🔄 中键拖动: 旋转视角</p>
-        <p className="text-sm text-gray-300">👆 点击行星: 查看信息</p>
+      <div className="absolute bottom-6 left-6 interstellar-glass interstellar-border rounded-xl p-4 fade-in hud-element">
+        <p className="text-sm text-interstellar-cyan/80 rajdhani-font mb-2">🖱️ DRAG: MOVE VIEW</p>
+        <p className="text-sm text-interstellar-cyan/80 rajdhani-font mb-2">🔍 SCROLL: ZOOM</p>
+        <p className="text-sm text-interstellar-cyan/80 rajdhani-font mb-2">🔄 MIDDLE DRAG: ROTATE</p>
+        <p className="text-sm text-interstellar-cyan/80 rajdhani-font">👆 CLICK: PLANET INFO</p>
         {performanceConfig.isMobile && (
-          <p className="mt-3 text-yellow-400 text-sm">📱 移动设备优化模式已启用</p>
+          <p className="mt-3 text-interstellar-gold rajdhani-font text-sm">📱 MOBILE OPTIMIZATION ENABLED</p>
         )}
       </div>
 
-      <div className="absolute top-6 left-6 glass-effect rounded-xl p-4 slide-in-left">
-        <h2 className="text-xl font-bold mb-3 bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-          🌍 太阳系
+      <div className="absolute top-6 left-6 interstellar-glass interstellar-border rounded-xl p-4 slide-in-left hud-element">
+        <h2 className="text-xl font-bold mb-3 interstellar-font bg-gradient-to-r from-interstellar-cyan to-interstellar-purple bg-clip-text text-transparent">
+          SOLAR SYSTEM
         </h2>
         <div className="space-y-2 text-xs">
           {solarSystemData.planets.map((planet, index) => (
             <div 
               key={planet.id} 
-              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-interstellar-deep/50 transition-colors cursor-pointer interstellar-card"
               style={{ animationDelay: `${index * 0.1}s` }}
               onClick={() => setSelectedPlanet(planet)}
             >
@@ -584,7 +584,7 @@ const SolarSystemCanvas: React.FC = () => {
                   boxShadow: `0 0 8px ${planet.glowColor}`
                 }}
               />
-              <span className="text-gray-300">{planet.name}</span>
+              <span className="text-interstellar-gray rajdhani-font uppercase">{planet.name}</span>
             </div>
           ))}
         </div>
