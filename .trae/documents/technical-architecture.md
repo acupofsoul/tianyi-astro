@@ -100,6 +100,11 @@ interface GalaxyFormation {
 - `GalaxyClusterComponent`: 星系团和超星系团展示
 - `DarkMatterEnergyComponent`: 暗物质和暗能量可视化
 
+### 5.4 通用组件
+- `QuickAccessToolbar`: 快速访问工具栏
+- `InteractiveLearningCard`: 交互式学习卡片
+- `ViewControl`: 视角控制组件
+
 ## 6. 性能优化策略
 - 使用 `useRef` 存储Canvas上下文，避免重复获取
 - 实现动画节流，确保在低性能设备上也能流畅运行
