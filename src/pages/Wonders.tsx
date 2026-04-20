@@ -76,7 +76,7 @@ const BlackHoleSimulator = () => {
     let animationId: number
     let time = 0
 
-    const stars = Array(150).fill(0).map(() => ({
+    const stars = Array(200).fill(0).map(() => ({
       x: Math.random(),
       y: Math.random(),
       size: Math.random() * 2 + 0.5,
@@ -86,7 +86,7 @@ const BlackHoleSimulator = () => {
     const draw = () => {
       const centerX = canvas.width / 2
       const centerY = canvas.height / 2
-      const blackHoleRadius = 50
+      const blackHoleRadius = 60
 
       ctx.fillStyle = '#050a14'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -100,6 +100,15 @@ const BlackHoleSimulator = () => {
       ctx.fillStyle = gradient1
       ctx.fillRect(0, 0, canvas.width, canvas.height)
 
+      const gradient2 = ctx.createRadialGradient(
+        centerX, centerY, 0,
+        centerX, centerY, blackHoleRadius * 8
+      )
+      gradient2.addColorStop(0, 'rgba(0, 212, 255, 0.05)')
+      gradient2.addColorStop(1, 'transparent')
+      ctx.fillStyle = gradient2
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+
       stars.forEach((star, i) => {
         const twinkle = Math.sin(time * star.twinkleSpeed + i) * 0.3 + 0.7
         const x = star.x * canvas.width
@@ -110,7 +119,7 @@ const BlackHoleSimulator = () => {
         const dist = Math.sqrt(dx * dx + dy * dy)
         
         if (dist > blackHoleRadius * 2) {
-          const lensEffect = Math.min(20 / (dist / 100 + 1), 15)
+          const lensEffect = Math.min(30 / (dist / 100 + 1), 20)
           const lensX = x + (dx / dist) * lensEffect
           const lensY = y + (dy / dist) * lensEffect
           
@@ -121,50 +130,54 @@ const BlackHoleSimulator = () => {
         }
       })
 
-      for (let layer = 0; layer < 5; layer++) {
-        const diskRadius = 120 + layer * 30
+      const diskRotation = time * 0.005 * speed
+      
+      for (let layer = 0; layer < 12; layer++) {
+        const diskRadius = 90 + layer * 15
+        const diskThickness = 8 + layer * 2
         
         ctx.save()
         ctx.translate(centerX, centerY)
-        ctx.rotate(0.4)
-        ctx.scale(1, 0.3)
+        ctx.rotate(diskRotation)
+        ctx.scale(1, 0.15)
         
-        const diskGradient = ctx.createRadialGradient(0, 0, blackHoleRadius + 20, 0, 0, diskRadius + 50)
+        const diskGradient = ctx.createLinearGradient(-diskRadius, 0, diskRadius, 0)
         
-        const layerColors = [
-          ['#ff0000', '#ff6600', '#ffcc00'],
-          ['#ff6600', '#ff9900', '#ffcc66'],
-          ['#ffcc00', '#ffff66', '#ffffff'],
-          ['#9966ff', '#cc66ff', '#ff66cc'],
-          ['#66ccff', '#66ffff', '#ffffff']
+        const colors = [
+          ['#ff6b6b', '#ff4757', '#ff3742'],
+          ['#ffbe76', '#ffa502', '#ff9f43'],
+          ['#f9ca24', '#feca57', '#ffda79'],
+          ['#7bed9f', '#2ed573', '#1e90ff']
         ]
         
+        const colorSet = colors[layer % colors.length]
         diskGradient.addColorStop(0, 'transparent')
-        diskGradient.addColorStop(0.3, `${layerColors[layer][0]}${Math.floor(150 * accretionBrightness).toString(16).padStart(2, '0')}`)
-        diskGradient.addColorStop(0.5, `${layerColors[layer][1]}${Math.floor(100 * accretionBrightness).toString(16).padStart(2, '0')}`)
-        diskGradient.addColorStop(0.7, `${layerColors[layer][2]}${Math.floor(50 * accretionBrightness).toString(16).padStart(2, '0')}`)
+        diskGradient.addColorStop(0.45, `${colorSet[0]}${Math.floor(120 * accretionBrightness).toString(16).padStart(2, '0')}`)
+        diskGradient.addColorStop(0.5, `${colorSet[1]}${Math.floor(200 * accretionBrightness).toString(16).padStart(2, '0')}`)
+        diskGradient.addColorStop(0.55, `${colorSet[2]}${Math.floor(120 * accretionBrightness).toString(16).padStart(2, '0')}`)
         diskGradient.addColorStop(1, 'transparent')
         
         ctx.beginPath()
-        ctx.arc(0, 0, diskRadius + Math.sin(time * 0.05 + layer) * 5, 0, Math.PI * 2)
+        ctx.ellipse(0, 0, diskRadius, diskThickness, 0, 0, Math.PI * 2)
         ctx.fillStyle = diskGradient
         ctx.fill()
         
         ctx.restore()
       }
 
-      for (let i = 0; i < 30; i++) {
-        const angle = (i / 30) * Math.PI * 2 + time * 0.02 * speed
-        const distance = 90 + Math.sin(i * 0.5 + time * 0.1) * 20
+      for (let i = 0; i < 80; i++) {
+        const angle = (i / 80) * Math.PI * 2 + time * 0.03 * speed
+        const distance = 80 + Math.sin(i * 0.3 + time * 0.15) * 30
         const x = Math.cos(angle) * distance
-        const y = Math.sin(angle) * distance * 0.3
+        const y = Math.sin(angle) * distance * 0.15
         
         ctx.save()
         ctx.translate(centerX, centerY)
-        ctx.rotate(0.4)
+        ctx.rotate(diskRotation)
         
         const particleGradient = ctx.createRadialGradient(x, y, 0, x, y, 8)
-        particleGradient.addColorStop(0, `rgba(255, 200, 100, ${0.9 * accretionBrightness})`)
+        particleGradient.addColorStop(0, `rgba(255, 255, 255, ${0.9 * accretionBrightness})`)
+        particleGradient.addColorStop(0.5, `rgba(255, 193, 7, ${0.6 * accretionBrightness})`)
         particleGradient.addColorStop(1, 'transparent')
         
         ctx.beginPath()
@@ -177,13 +190,13 @@ const BlackHoleSimulator = () => {
 
       const coronaGradient = ctx.createRadialGradient(
         centerX, centerY, blackHoleRadius,
-        centerX, centerY, blackHoleRadius * 3
+        centerX, centerY, blackHoleRadius * 3.5
       )
-      coronaGradient.addColorStop(0, 'rgba(255, 100, 50, 0.4)')
-      coronaGradient.addColorStop(0.3, 'rgba(255, 50, 0, 0.2)')
+      coronaGradient.addColorStop(0, 'rgba(255, 193, 7, 0.2)')
+      coronaGradient.addColorStop(0.3, 'rgba(255, 87, 34, 0.1)')
       coronaGradient.addColorStop(1, 'transparent')
       ctx.beginPath()
-      ctx.arc(centerX, centerY, blackHoleRadius * 3, 0, Math.PI * 2)
+      ctx.arc(centerX, centerY, blackHoleRadius * 3.5, 0, Math.PI * 2)
       ctx.fillStyle = coronaGradient
       ctx.fill()
 
@@ -201,29 +214,30 @@ const BlackHoleSimulator = () => {
       ctx.fill()
 
       ctx.shadowColor = '#000000'
-      ctx.shadowBlur = 30
+      ctx.shadowBlur = 80
       ctx.beginPath()
       ctx.arc(centerX, centerY, blackHoleRadius, 0, Math.PI * 2)
       ctx.fill()
       ctx.shadowBlur = 0
 
       for (let i = 0; i < 8; i++) {
-        const jetOffset = (i - 3.5) * 15
-        const jetLength = 100 + Math.sin(time * 0.1 + i) * 30
+        const jetOffset = (i - 3.5) * 8
+        const jetLength = 200 + Math.sin(time * 0.1 + i) * 60
         
         ctx.save()
         ctx.translate(centerX, centerY)
-        ctx.rotate(0.4)
+        ctx.rotate(diskRotation)
         
         const jetGradient = ctx.createLinearGradient(0, 0, 0, jetLength * (i % 2 === 0 ? -1 : 1))
-        jetGradient.addColorStop(0, 'rgba(100, 200, 255, 0.8)')
-        jetGradient.addColorStop(0.5, 'rgba(150, 100, 255, 0.4)')
+        jetGradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)')
+        jetGradient.addColorStop(0.3, 'rgba(255, 193, 7, 0.7)')
+        jetGradient.addColorStop(0.7, 'rgba(255, 87, 34, 0.4)')
         jetGradient.addColorStop(1, 'transparent')
         
         ctx.beginPath()
-        ctx.moveTo(jetOffset * 0.5, 0)
-        ctx.lineTo(jetOffset * 0.3 + 10, (i % 2 === 0 ? -1 : 1) * jetLength)
-        ctx.lineTo(jetOffset * 0.3 - 10, (i % 2 === 0 ? -1 : 1) * jetLength)
+        ctx.moveTo(jetOffset * 0.2, 0)
+        ctx.lineTo(jetOffset * 0.15 + 10, (i % 2 === 0 ? -1 : 1) * jetLength)
+        ctx.lineTo(jetOffset * 0.15 - 10, (i % 2 === 0 ? -1 : 1) * jetLength)
         ctx.closePath()
         ctx.fillStyle = jetGradient
         ctx.fill()
@@ -246,26 +260,26 @@ const BlackHoleSimulator = () => {
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
-        <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-orange-400 via-red-400 to-purple-400 bg-clip-text text-transparent">
+        <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
           🌀 黑洞
         </h2>
-        <p className="text-gray-400">宇宙中最强大的引力场，连光都无法逃脱</p>
+        <p className="text-interstellar-gray">宇宙中最强大的引力场，连光都无法逃脱</p>
       </div>
 
       <div className="relative">
         <canvas
           ref={canvasRef}
-          className="w-full rounded-2xl shadow-2xl"
-          style={{ boxShadow: '0 0 80px rgba(255, 100, 50, 0.2)' }}
+          className="w-full rounded-2xl interstellar-glass interstellar-border"
+          style={{ boxShadow: '0 0 120px rgba(0, 212, 255, 0.3), inset 0 0 80px rgba(0, 0, 0, 0.6)' }}
         />
         
-        <div className="absolute top-4 left-4 glass-effect rounded-xl p-4 max-w-xs slide-in-left">
-          <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-            <span className="text-red-400">⚙️</span> 控制面板
+        <div className="absolute top-4 left-4 interstellar-glass interstellar-border rounded-xl p-4 max-w-xs slide-in-left hud-element">
+          <h3 className="text-white font-bold mb-3 flex items-center gap-2 interstellar-font text-sm">
+            <span className="text-interstellar-cyan">⚙️</span> 控制面板
           </h3>
           <div className="space-y-4">
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">旋转速度</label>
+              <label className="text-sm text-interstellar-cyan/70 mb-1 block rajdhani-font">旋转速度</label>
               <input
                 type="range"
                 min="0.1"
@@ -273,12 +287,12 @@ const BlackHoleSimulator = () => {
                 step="0.1"
                 value={speed}
                 onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                className="w-full accent-cyan-500"
+                className="w-full accent-interstellar-cyan"
               />
-              <div className="text-xs text-gray-500 text-center mt-1">{speed.toFixed(1)}x</div>
+              <div className="text-xs text-interstellar-cyan/60 text-center mt-1 rajdhani-font">{speed.toFixed(1)}x</div>
             </div>
             <div>
-              <label className="text-sm text-gray-400 mb-1 block">吸积盘亮度</label>
+              <label className="text-sm text-interstellar-cyan/70 mb-1 block rajdhani-font">吸积盘亮度</label>
               <input
                 type="range"
                 min="0.1"
@@ -286,53 +300,53 @@ const BlackHoleSimulator = () => {
                 step="0.1"
                 value={accretionBrightness}
                 onChange={(e) => setAccretionBrightness(parseFloat(e.target.value))}
-                className="w-full accent-orange-500"
+                className="w-full accent-interstellar-purple"
               />
-              <div className="text-xs text-gray-500 text-center mt-1">{accretionBrightness.toFixed(1)}x</div>
+              <div className="text-xs text-interstellar-cyan/60 text-center mt-1 rajdhani-font">{accretionBrightness.toFixed(1)}x</div>
             </div>
           </div>
         </div>
 
-        <div className="absolute top-4 right-4 glass-effect rounded-xl p-4 max-w-xs slide-in-right">
-          <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-            <span className="text-cyan-400">📊</span> 黑洞数据
+        <div className="absolute top-4 right-4 interstellar-glass interstellar-border rounded-xl p-4 max-w-xs slide-in-right hud-element">
+          <h3 className="text-white font-bold mb-3 flex items-center gap-2 interstellar-font text-sm">
+            <span className="text-interstellar-cyan">📊</span> 黑洞数据
           </h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-400">质量:</span>
-              <span className="text-white">10,000,000 M☉</span>
+          <div className="space-y-2 text-sm rajdhani-font">
+            <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
+              <span className="text-interstellar-cyan/70">质量:</span>
+              <span className="text-interstellar-white">10,000,000 M☉</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">事件视界:</span>
-              <span className="text-white">3,000 km</span>
+            <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
+              <span className="text-interstellar-cyan/70">事件视界:</span>
+              <span className="text-interstellar-white">3,000 km</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">吸积盘温度:</span>
-              <span className="text-white">1,000,000°C</span>
+            <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
+              <span className="text-interstellar-cyan/70">吸积盘温度:</span>
+              <span className="text-interstellar-white">1,000,000°C</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-400">类型:</span>
-              <span className="text-white">超大质量黑洞</span>
+            <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
+              <span className="text-interstellar-cyan/70">类型:</span>
+              <span className="text-interstellar-white">超大质量黑洞</span>
             </div>
           </div>
         </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4 mt-6">
-        <div className="glass-effect rounded-xl p-4 card-hover">
+        <div className="interstellar-glass interstellar-border rounded-xl p-4 interstellar-card">
           <div className="text-3xl mb-2">💨</div>
-          <h4 className="font-bold text-white mb-1">事件视界</h4>
-          <p className="text-gray-400 text-sm">连光都无法逃脱的边界，任何物质进入后都无法返回</p>
+          <h4 className="font-bold text-white mb-1 interstellar-font text-sm">事件视界</h4>
+          <p className="text-interstellar-gray text-sm rajdhani-font">连光都无法逃脱的边界，任何物质进入后都无法返回</p>
         </div>
-        <div className="glass-effect rounded-xl p-4 card-hover">
+        <div className="interstellar-glass interstellar-border rounded-xl p-4 interstellar-card">
           <div className="text-3xl mb-2">🌀</div>
-          <h4 className="font-bold text-white mb-1">吸积盘</h4>
-          <p className="text-gray-400 text-sm">被黑洞引力捕获的物质形成的旋转盘，摩擦产生极高温度</p>
+          <h4 className="font-bold text-white mb-1 interstellar-font text-sm">吸积盘</h4>
+          <p className="text-interstellar-gray text-sm rajdhani-font">被黑洞引力捕获的物质形成的旋转盘，摩擦产生极高温度</p>
         </div>
-        <div className="glass-effect rounded-xl p-4 card-hover">
+        <div className="interstellar-glass interstellar-border rounded-xl p-4 interstellar-card">
           <div className="text-3xl mb-2">💫</div>
-          <h4 className="font-bold text-white mb-1">相对论性喷流</h4>
-          <p className="text-gray-400 text-sm">高能粒子以接近光速的速度从黑洞两极喷射而出</p>
+          <h4 className="font-bold text-white mb-1 interstellar-font text-sm">相对论性喷流</h4>
+          <p className="text-interstellar-gray text-sm rajdhani-font">高能粒子以接近光速的速度从黑洞两极喷射而出</p>
         </div>
       </div>
     </div>

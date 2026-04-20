@@ -8,15 +8,15 @@ const Home = () => {
         <div className="container mx-auto px-4">
           <h1 className="text-5xl md:text-7xl font-bold mb-4 interstellar-font interstellar-text-glow">
             <span className="bg-gradient-to-r from-interstellar-cyan via-interstellar-purple to-interstellar-pink bg-clip-text text-transparent">
-              INTERSTELLAR
+              星际穿越
             </span>
           </h1>
           <h2 className="text-2xl md:text-3xl font-light mb-6 rajdhani-font text-interstellar-cyan/80">
-            EXPLORATION
+            宇宙探索
           </h2>
           <p className="text-interstellar-gray max-w-2xl mx-auto text-sm md:text-base rajdhani-font leading-relaxed">
-            Embark on a journey through the cosmos, exploring distant galaxies, mysterious black holes, 
-            and the wonders of our solar system. Experience the beauty and majesty of space in stunning detail.
+            踏上穿越宇宙的旅程，探索遥远的星系、神秘的黑洞，
+            以及太阳系的奇观。体验太空的美丽与壮丽，细节令人惊叹。
           </p>
         </div>
       </div>
@@ -31,26 +31,26 @@ const Home = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-center md:text-left">
-              <p className="text-xs text-interstellar-cyan/60 rajdhani-font">SYSTEM STATUS</p>
-              <p className="text-sm text-interstellar-white">All systems operational</p>
+              <p className="text-xs text-interstellar-cyan/60 rajdhani-font">系统状态</p>
+              <p className="text-sm text-interstellar-white">所有系统正常运行</p>
             </div>
             <div className="flex items-center gap-6">
               <div className="text-center">
-                <p className="text-xs text-interstellar-cyan/60 rajdhani-font">STARS</p>
+                <p className="text-xs text-interstellar-cyan/60 rajdhani-font">恒星</p>
                 <p className="text-sm font-bold text-interstellar-white">200+</p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-interstellar-cyan/60 rajdhani-font">PLANETS</p>
+                <p className="text-xs text-interstellar-cyan/60 rajdhani-font">行星</p>
                 <p className="text-sm font-bold text-interstellar-white">8</p>
               </div>
               <div className="text-center">
-                <p className="text-xs text-interstellar-cyan/60 rajdhani-font">WONDERS</p>
+                <p className="text-xs text-interstellar-cyan/60 rajdhani-font">奇观</p>
                 <p className="text-sm font-bold text-interstellar-white">5</p>
               </div>
             </div>
             <div className="text-center md:text-right">
-              <p className="text-xs text-interstellar-cyan/60 rajdhani-font">NAVIGATION</p>
-              <p className="text-sm text-interstellar-white">Ready for exploration</p>
+              <p className="text-xs text-interstellar-cyan/60 rajdhani-font">导航系统</p>
+              <p className="text-sm text-interstellar-white">准备就绪，等待探索</p>
             </div>
           </div>
         </div>

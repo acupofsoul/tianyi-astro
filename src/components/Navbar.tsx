@@ -15,11 +15,11 @@ const Navbar = () => {
   }, [])
 
   const navLinks = [
-    { path: '/', label: 'HOME', icon: '🌍' },
-    { path: '/wonders', label: 'WONDERS', icon: '✨' },
-    { path: '/galaxies', label: 'GALAXIES', icon: '🌌' },
-    { path: '/learning', label: 'LEARNING', icon: '📚' },
-    { path: '/about', label: 'ABOUT', icon: 'ℹ️' }
+    { path: '/', label: '首页', icon: 'home' },
+    { path: '/wonders', label: '奇观', icon: 'star' },
+    { path: '/galaxies', label: '星系', icon: 'galaxy' },
+    { path: '/learning', label: '学习', icon: 'book' },
+    { path: '/about', label: '关于', icon: 'info' }
   ]
 
   return (
@@ -28,14 +28,14 @@ const Navbar = () => {
         <div className="flex justify-between items-center">
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-interstellar-cyan to-interstellar-purple flex items-center justify-center text-2xl interstellar-glow transition-all duration-300 group-hover:scale-110">
-              🌌
+              🚀
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-bold bg-gradient-to-r from-interstellar-cyan to-interstellar-purple bg-clip-text text-transparent interstellar-font">
-                EXPLORER
+                宇宙探索
               </span>
               <span className="text-xs text-interstellar-cyan/80 rajdhani-font">
-                INTERSTELLAR NAVIGATION
+                星际导航系统
               </span>
             </div>
           </Link>
@@ -53,8 +53,8 @@ const Navbar = () => {
                 }`}
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
-                <span className="text-sm">{link.icon}</span>
-                <span className="uppercase">{link.label}</span>
+                <span className="text-sm">{link.icon === 'home' ? '🏠' : link.icon === 'star' ? '⭐' : link.icon === 'galaxy' ? '🌌' : link.icon === 'book' ? '📚' : 'ℹ️'}</span>
+                <span>{link.label}</span>
                 {location.pathname === link.path && (
                   <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-12 h-0.5 bg-gradient-to-r from-interstellar-cyan to-interstellar-purple rounded-full" />
                 )}
@@ -64,10 +64,10 @@ const Navbar = () => {
           
           {/* 快速访问工具栏 */}
           <div className="hidden md:flex items-center gap-3">
-            <button className="p-2.5 rounded-lg interstellar-btn text-interstellar-gray hover:text-interstellar-cyan transition-all">
+            <button className="p-2.5 rounded-lg interstellar-btn text-interstellar-gray hover:text-interstellar-cyan transition-all" title="搜索">
               🔍
             </button>
-            <button className="p-2.5 rounded-lg interstellar-btn text-interstellar-gray hover:text-interstellar-cyan transition-all">
+            <button className="p-2.5 rounded-lg interstellar-btn text-interstellar-gray hover:text-interstellar-cyan transition-all" title="收藏">
               ⭐
             </button>
           </div>
@@ -76,6 +76,7 @@ const Navbar = () => {
           <button 
             className="md:hidden p-3 rounded-lg interstellar-btn text-interstellar-gray hover:text-interstellar-cyan transition-all"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            title="菜单"
           >
             {mobileMenuOpen ? (
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -104,8 +105,8 @@ const Navbar = () => {
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <span>{link.icon}</span>
-                  <span className="interstellar-font text-sm uppercase">{link.label}</span>
+                  <span>{link.icon === 'home' ? '🏠' : link.icon === 'star' ? '⭐' : link.icon === 'galaxy' ? '🌌' : link.icon === 'book' ? '📚' : 'ℹ️'}</span>
+                  <span className="interstellar-font text-sm">{link.label}</span>
                 </div>
               </Link>
             ))}
@@ -113,13 +114,13 @@ const Navbar = () => {
               <button className="flex-1 py-3 px-4 rounded-lg interstellar-btn text-interstellar-gray hover:text-interstellar-cyan transition-all">
                 <div className="flex items-center gap-2">
                   <span>🔍</span>
-                  <span className="interstellar-font text-sm">SEARCH</span>
+                  <span className="interstellar-font text-sm">搜索</span>
                 </div>
               </button>
               <button className="flex-1 py-3 px-4 rounded-lg interstellar-btn text-interstellar-gray hover:text-interstellar-cyan transition-all">
                 <div className="flex items-center gap-2">
                   <span>⭐</span>
-                  <span className="interstellar-font text-sm">FAVORITES</span>
+                  <span className="interstellar-font text-sm">收藏</span>
                 </div>
               </button>
             </div>

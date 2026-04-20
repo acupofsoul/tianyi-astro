@@ -526,48 +526,48 @@ const SolarSystemCanvas: React.FC = () => {
       {selectedPlanet && (
         <div className="absolute top-6 right-6 interstellar-glass interstellar-border rounded-2xl p-6 max-w-sm fade-in hud-element">
           <h3 className="text-2xl font-bold mb-4 interstellar-font interstellar-text-glow" style={{ color: selectedPlanet.glowColor }}>
-            {selectedPlanet.name.toUpperCase()}
+            {selectedPlanet.name}
           </h3>
           <div className="space-y-3 text-sm rajdhani-font">
             <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
-              <span className="text-interstellar-cyan/70">RADIUS:</span>
-              <span className="text-interstellar-white font-medium">{selectedPlanet.radius} UNITS</span>
+              <span className="text-interstellar-cyan/70">半径:</span>
+              <span className="text-interstellar-white font-medium">{selectedPlanet.radius} 单位</span>
             </div>
             <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
-              <span className="text-interstellar-cyan/70">ORBIT DISTANCE:</span>
+              <span className="text-interstellar-cyan/70">轨道距离:</span>
               <span className="text-interstellar-white font-medium">{selectedPlanet.distance} AU</span>
             </div>
             <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
-              <span className="text-interstellar-cyan/70">ORBITAL PERIOD:</span>
-              <span className="text-interstellar-white font-medium">{selectedPlanet.orbitalPeriod} DAYS</span>
+              <span className="text-interstellar-cyan/70">公转周期:</span>
+              <span className="text-interstellar-white font-medium">{selectedPlanet.orbitalPeriod} 天</span>
             </div>
             <div className="flex justify-between border-b border-interstellar-cyan/20 pb-2">
-              <span className="text-interstellar-cyan/70">ROTATION PERIOD:</span>
-              <span className="text-interstellar-white font-medium">{selectedPlanet.rotationPeriod} DAYS</span>
+              <span className="text-interstellar-cyan/70">自转周期:</span>
+              <span className="text-interstellar-white font-medium">{selectedPlanet.rotationPeriod} 天</span>
             </div>
           </div>
           <button
             onClick={() => setSelectedPlanet(null)}
             className="mt-4 w-full py-3 px-4 interstellar-btn text-interstellar-cyan hover:text-interstellar-white transition-all"
           >
-            <span className="interstellar-font text-xs uppercase">CLOSE</span>
+            <span className="interstellar-font text-xs">关闭</span>
           </button>
         </div>
       )}
       
       <div className="absolute bottom-6 left-6 interstellar-glass interstellar-border rounded-xl p-4 fade-in hud-element">
-        <p className="text-sm text-interstellar-cyan/80 rajdhani-font mb-2">🖱️ DRAG: MOVE VIEW</p>
-        <p className="text-sm text-interstellar-cyan/80 rajdhani-font mb-2">🔍 SCROLL: ZOOM</p>
-        <p className="text-sm text-interstellar-cyan/80 rajdhani-font mb-2">🔄 MIDDLE DRAG: ROTATE</p>
-        <p className="text-sm text-interstellar-cyan/80 rajdhani-font">👆 CLICK: PLANET INFO</p>
+        <p className="text-sm text-interstellar-cyan/80 rajdhani-font mb-2">🖱️ 拖动: 移动视角</p>
+        <p className="text-sm text-interstellar-cyan/80 rajdhani-font mb-2">🔍 滚轮: 缩放</p>
+        <p className="text-sm text-interstellar-cyan/80 rajdhani-font mb-2">🔄 中键拖动: 旋转</p>
+        <p className="text-sm text-interstellar-cyan/80 rajdhani-font">👆 点击: 行星信息</p>
         {performanceConfig.isMobile && (
-          <p className="mt-3 text-interstellar-gold rajdhani-font text-sm">📱 MOBILE OPTIMIZATION ENABLED</p>
+          <p className="mt-3 text-interstellar-gold rajdhani-font text-sm">📱 移动设备优化已启用</p>
         )}
       </div>
 
       <div className="absolute top-6 left-6 interstellar-glass interstellar-border rounded-xl p-4 slide-in-left hud-element">
         <h2 className="text-xl font-bold mb-3 interstellar-font bg-gradient-to-r from-interstellar-cyan to-interstellar-purple bg-clip-text text-transparent">
-          SOLAR SYSTEM
+          太阳系
         </h2>
         <div className="space-y-2 text-xs">
           {solarSystemData.planets.map((planet, index) => (
