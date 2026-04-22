@@ -126,9 +126,9 @@ const BlackHoleSimulator = () => {
       
       if (dist < blackHoleRadius * 1.2) return { x, y, visible: false }
       
-      const lensStrength = 120 / (dist / 60 + 1) * lensingStrength
-      const lensX = x + (dx / dist) * lensStrength * 0.6
-      const lensY = y + (dy / dist) * lensStrength * 0.6
+      const calculatedLensStrength = 120 / (dist / 60 + 1) * lensingStrength
+      const lensX = x + (dx / dist) * calculatedLensStrength * 0.6
+      const lensY = y + (dy / dist) * calculatedLensStrength * 0.6
       
       return { x: lensX, y: lensY, visible: true }
     }
