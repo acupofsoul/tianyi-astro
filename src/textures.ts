@@ -102,6 +102,10 @@ export interface RockyOpts {
   ocean?: string
   polar?: boolean
   craters?: number
+  darkPatches?: number
+  darkColor?: string
+  brightPatches?: number
+  brightColor?: string
 }
 
 export function rockyTexture(seed: number, opts: RockyOpts): THREE.Texture {
@@ -120,6 +124,16 @@ export function rockyTexture(seed: number, opts: RockyOpts): THREE.Texture {
   const nCraters = opts.craters ?? 0
   for (let k = 0; k < nCraters; k++) {
     craters.push({ x: rng(), y: rng(), r: 0.02 + rng() * 0.08 })
+  }
+  const dark: { x: number; y: number; rx: number; ry: number; color: RGB }[] = []
+  const bright: { x: number; y: number; rx: number; ry: number; color: RGB }[] = []
+  const nDark = opts.darkPatches ?? 0
+  const nBright = opts.brightPatches ?? 0
+  for (let k = 0; k < nDark; k++) {
+    dark.push({ x: rng(), y: rng(), rx: 0.08 + rng() * 0.2, ry: 0.04 + rng() * 0.11, color: hexToRgb(opts.darkColor ?? '#3a2f28') })
+  }
+  for (let k = 0; k < nBright; k++) {
+    bright.push({ x: rng(), y: rng(), rx: 0.06 + rng() * 0.16, ry: 0.03 + rng() * 0.09, color: hexToRgb(opts.brightColor ?? '#f5ead2') })
   }
   const hasOcean = !!ocean
   for (let y = 0; y < h; y++) {
@@ -152,6 +166,24 @@ export function rockyTexture(seed: number, opts: RockyOpts): THREE.Texture {
           col = mixRgb(col, [26, 28, 38], (1 - d) * 0.65)
         }
       }
+      for (const p of dark) {
+        const dx = (u - p.x) / p.rx
+        const dy = (v - p.y) / p.ry
+        const d2 = dx * dx + dy * dy
+        if (d2 < 1) {
+          const d = Math.sqrt(d2)
+          col = mixRgb(col, p.color, (1 - d) * 0.55)
+        }
+      }
+      for (const p of bright) {
+        const dx = (u - p.x) / p.rx
+        const dy = (v - p.y) / p.ry
+        const d2 = dx * dx + dy * dy
+        if (d2 < 1) {
+          const d = Math.sqrt(d2)
+          col = mixRgb(col, p.color, (1 - d) * 0.4)
+        }
+      }
       const i = (y * w + x) * 4
       data[i] = col[0]
       data[i + 1] = col[1]
@@ -165,8 +197,12 @@ export function rockyTexture(seed: number, opts: RockyOpts): THREE.Texture {
   return tex
 }
 
-export function gasTexture(seed: number, colors: string[]): THREE.Texture {
-  const key = 'gas|' + seed + '|' + colors.join(',')
+export interface GasOpts {
+  spot?: { x: number; y: number; rx: number; ry: number; color: string }
+}
+
+export function gasTexture(seed: number, colors: string[], opts: GasOpts = {}): THREE.Texture {
+  const key = 'gas|' + seed + '|' + colors.join(',') + '|' + JSON.stringify(opts)
   const hit = cache.get(key)
   if (hit) return hit
   const w = 512
@@ -176,6 +212,9 @@ export function gasTexture(seed: number, colors: string[]): THREE.Texture {
   const data = img.data
   const pal = colors.map(hexToRgb)
   const bands = pal.length
+  const spot = opts.spot
+    ? { x: opts.spot.x, y: opts.spot.y, rx: opts.spot.rx, ry: opts.spot.ry, color: hexToRgb(opts.spot.color) }
+    : null
   for (let y = 0; y < h; y++) {
     const v = y / h
     for (let x = 0; x < w; x++) {
@@ -189,6 +228,53 @@ export function gasTexture(seed: number, colors: string[]): THREE.Texture {
       let col = mixRgb(c0, c1, smooth(Math.min(1, Math.max(0, t))))
       const shade = 0.72 + 0.38 * fbm(u * 22, v * 26, seed + 3, 4)
       col = mixRgb(col, [0, 0, 0], (1 - shade) * 0.5)
+      if (spot) {
+        const dx = (u - spot.x) / spot.rx
+        const dy = (v - spot.y) / spot.ry
+        const d2 = dx * dx + dy * dy
+        if (d2 < 1) {
+          const d = Math.sqrt(d2)
+          col = mixRgb(col, spot.color, (1 - d) * 0.85)
+        }
+      }
+      const i = (y * w + x) * 4
+      data[i] = col[0]
+      data[i + 1] = col[1]
+      data[i + 2] = col[2]
+      data[i + 3] = 255
+    }
+  }
+  ctx.putImageData(img, 0, 0)
+  const tex = toTexture(canvas)
+  cache.set(key, tex)
+  return tex
+}
+
+export function venusTexture(seed: number): THREE.Texture {
+  const key = 'venus|' + seed
+  const hit = cache.get(key)
+  if (hit) return hit
+  const w = 512
+  const h = 256
+  const { canvas, ctx } = makeCanvas(w, h)
+  const img = ctx.createImageData(w, h)
+  const data = img.data
+  const pal: RGB[] = [
+    hexToRgb('#efe0b8'),
+    hexToRgb('#e8d5a0'),
+    hexToRgb('#dcc58a'),
+    hexToRgb('#f4e8c8')
+  ]
+  for (let y = 0; y < h; y++) {
+    const v = y / h
+    for (let x = 0; x < w; x++) {
+      const u = x / w
+      const d = fbm(u * 2.5, v * 6, seed, 4)
+      let col = sample(pal, 0.5 + (d - 0.5) * 0.8)
+      const streak = fbm(u * 10 + 0.4 * fbm(u * 3, v * 8, seed + 2, 3), v * 14, seed + 4, 3)
+      col = mixRgb(col, [255, 250, 230], (Math.max(0, streak - 0.62) / 0.38) * 0.22)
+      const shade = 0.96 + 0.08 * fbm(u * 20, v * 20, seed + 6, 2)
+      col = mixRgb(col, [0, 0, 0], (1 - shade) * 0.45)
       const i = (y * w + x) * 4
       data[i] = col[0]
       data[i + 1] = col[1]
@@ -317,8 +403,14 @@ export function sunTexture(seed: number): THREE.Texture {
 }
 
 // ------------------------------------------------------------------ rings --
-export function ringTexture(inner: number, outer: number, seed: number, colors: string[]): THREE.Texture {
-  const key = 'ring|' + seed + '|' + colors.join(',')
+export function ringTexture(
+  inner: number,
+  outer: number,
+  seed: number,
+  colors: string[],
+  gaps: [number, number][] = []
+): THREE.Texture {
+  const key = 'ring|' + seed + '|' + colors.join(',') + '|' + JSON.stringify(gaps)
   const hit = cache.get(key)
   if (hit) return hit
   const size = 512
@@ -341,8 +433,11 @@ export function ringTexture(inner: number, outer: number, seed: number, colors: 
       const t = (d - ir) / (1 - ir)
       const band = fbm(t * 16, 0.5, seed, 3)
       let col = sample(pal, t + band * 0.4)
-      const a = 0.8 * (0.55 + 0.45 * Math.sin(t * 52 + band * 14)) *
+      let a = 0.8 * (0.55 + 0.45 * Math.sin(t * 52 + band * 14)) *
         smoothstep(0, 0.05, t) * (1 - smoothstep(0.86, 1, t))
+      for (const [g0, g1] of gaps) {
+        if (t > g0 && t < g1) a *= 0.18
+      }
       data[i] = col[0]
       data[i + 1] = col[1]
       data[i + 2] = col[2]

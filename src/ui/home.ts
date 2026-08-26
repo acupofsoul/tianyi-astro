@@ -1,21 +1,41 @@
 import { Viewer } from '../viewer'
 import { buildStarfieldScene } from '../scenes'
-import { categories, searchCatalog } from '../catalog'
+import { categories, searchCatalog, catalog } from '../catalog'
 import { el, clear } from './dom'
 import { registerCleanup } from './router'
+import { renderSiteHeader } from './header'
 import type { CatalogEntry } from '../types'
 
+function parseQuery(): string {
+  const m = location.hash.match(/[?&]q=([^&]+)/)
+  return m ? decodeURIComponent(m[1]) : ''
+}
+
 export function renderHome(root: HTMLElement) {
-  document.title = '天一天文馆 · 3D 天文科普'
+  document.title = '知天易 · 3D 天文科学馆'
   clear(root)
 
-  const hero = el('header', 'hero')
+  const state = { q: parseQuery(), cat: '全部' }
+
+  const header = renderSiteHeader({
+    query: state.q,
+    onInput: (q) => {
+      state.q = q
+      renderGrid()
+    }
+  })
+  root.appendChild(header)
+
+  const hero = el('section', 'hero')
   hero.innerHTML = `
     <div id="hero-canvas" class="hero-canvas"></div>
     <div class="hero-content">
-      <h1>天一天文馆</h1>
-      <p>拖动 · 缩放 · 旋转 — 探索太阳系、黑洞与星云的 3D 世界</p>
-      <input id="search-input" type="search" placeholder="搜索天文现象，如：黑洞、土星、哈雷彗星、极光…" autocomplete="off" />
+      <h1>知天易</h1>
+      <p class="tagline">以科学为尺度，触摸真实的宇宙</p>
+      <div class="hero-actions">
+        <a href="#/p/solar-system" class="btn-primary">🌌 探索太阳系</a>
+        <button class="btn-ghost" id="random-btn">🎲 随机漫游</button>
+      </div>
     </div>
   `
   root.appendChild(hero)
@@ -29,7 +49,7 @@ export function renderHome(root: HTMLElement) {
   gridWrap.appendChild(grid)
   root.appendChild(gridWrap)
 
-  const footer = el('footer', undefined, '天一天文馆 · 3D 天文科普 · Three.js 程序化生成，无需外部贴图')
+  const footer = el('footer', undefined, '知天易 · 3D 天文科学馆 · 三维场景与贴图均为程序化生成')
   root.appendChild(footer)
 
   const heroCanvas = hero.querySelector<HTMLElement>('#hero-canvas')!
@@ -38,8 +58,10 @@ export function renderHome(root: HTMLElement) {
   viewer.start()
   registerCleanup(() => viewer.dispose())
 
-  let q = ''
-  let cat = '全部'
+  hero.querySelector<HTMLButtonElement>('#random-btn')!.addEventListener('click', () => {
+    const item = catalog[Math.floor(Math.random() * catalog.length)]
+    location.hash = '#/p/' + item.id
+  })
 
   function makeCard(item: CatalogEntry): HTMLAnchorElement {
     const a = el('a', 'card')
@@ -60,7 +82,7 @@ export function renderHome(root: HTMLElement) {
 
   function renderGrid() {
     clear(grid)
-    const items = searchCatalog(q, cat)
+    const items = searchCatalog(state.q, state.cat)
     if (items.length === 0) {
       grid.appendChild(el('div', 'empty', '未找到相关天体，换个关键词试试吧 🌠'))
       return
@@ -72,21 +94,15 @@ export function renderHome(root: HTMLElement) {
     clear(chips)
     const all = ['全部', ...categories]
     for (const c of all) {
-      const chip = el('button', 'chip' + (c === cat ? ' active' : ''), c)
+      const chip = el('button', 'chip' + (c === state.cat ? ' active' : ''), c)
       chip.addEventListener('click', () => {
-        cat = c
+        state.cat = c
         renderChips()
         renderGrid()
       })
       chips.appendChild(chip)
     }
   }
-
-  const input = hero.querySelector<HTMLInputElement>('#search-input')!
-  input.addEventListener('input', () => {
-    q = input.value
-    renderGrid()
-  })
 
   renderChips()
   renderGrid()

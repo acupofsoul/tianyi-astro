@@ -68,6 +68,29 @@ export class Viewer {
     }
   }
 
+  setAutoRotate(on: boolean) {
+    if (this.controls) {
+      this.controls.autoRotate = on
+      this.controls.update()
+    }
+  }
+
+  isAutoRotate(): boolean {
+    return !!this.controls?.autoRotate
+  }
+
+  resetView() {
+    if (!this.handle) return
+    const pos = this.handle.camera?.position ?? [0, 1, 5]
+    const target = this.handle.camera?.target ?? [0, 0, 0]
+    this.camera.position.set(pos[0], pos[1], pos[2])
+    this.camera.lookAt(target[0], target[1], target[2])
+    if (this.controls) {
+      this.controls.target.set(target[0], target[1], target[2])
+      this.controls.update()
+    }
+  }
+
   start() {
     this.clock.start()
     const loop = () => {

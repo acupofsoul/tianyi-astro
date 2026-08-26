@@ -64,7 +64,8 @@ export const catalog: CatalogEntry[] = [
       { label: '表面温度', value: '-173 ~ 427 ℃' },
       { label: '卫星数', value: '0' }
     ],
-    ['行星', '岩石行星', '陨石坑', '内行星', '水星逆行']
+    ['行星', '岩石行星', '陨石坑', '内行星', '水星逆行'],
+    { kind: 'rocky', radius: 0.7, seed: 11, axialTilt: 0.03, rotationSpeed: 0.05, land: ['#b5a99a', '#968b7e', '#cfc4b2'], polar: true, craters: 70 }
   ),
 
   e(
@@ -80,7 +81,8 @@ export const catalog: CatalogEntry[] = [
       { label: '表面温度', value: '约 464 ℃' },
       { label: '大气压', value: '地球的 92 倍' }
     ],
-    ['行星', '启明星', '长庚星', '温室效应', '硫酸云']
+    ['行星', '启明星', '长庚星', '温室效应', '硫酸云'],
+    { kind: 'venus', radius: 0.95, seed: 22, axialTilt: 177.4, rotationSpeed: -0.05, atmosphere: '#e8c87e', atmosphereOpacity: 0.3 }
   ),
 
   e(
@@ -96,7 +98,8 @@ export const catalog: CatalogEntry[] = [
       { label: '平均温度', value: '约 15 ℃' },
       { label: '卫星数', value: '1（月球）' }
     ],
-    ['行星', '蓝色弹珠', '宜居带', '海洋', '生命', '大气']
+    ['行星', '蓝色弹珠', '宜居带', '海洋', '生命', '大气'],
+    { kind: 'earth', radius: 1, seed: 33, axialTilt: 23.4, rotationSpeed: 0.2, cloud: true, atmosphere: '#4a9df8' }
   ),
 
   e(
@@ -128,7 +131,8 @@ export const catalog: CatalogEntry[] = [
       { label: '平均温度', value: '约 -63 ℃' },
       { label: '卫星数', value: '2（火卫一/火卫二）' }
     ],
-    ['行星', '红色星球', '奥林帕斯山', '水手号峡谷', '火星车', '移民']
+    ['行星', '红色星球', '奥林帕斯山', '水手号峡谷', '火星车', '移民'],
+    { kind: 'rocky', radius: 0.75, seed: 44, axialTilt: 25.2, rotationSpeed: 0.18, land: ['#c1553b', '#a3432c', '#d97b5a', '#8f3a26'], polar: true, craters: 40, darkPatches: 16, darkColor: '#3a2f28' }
   ),
 
   e(
@@ -144,7 +148,8 @@ export const catalog: CatalogEntry[] = [
       { label: '平均温度', value: '约 -108 ℃' },
       { label: '卫星数', value: '95（已确认）' }
     ],
-    ['行星', '气态巨行星', '大红斑', '木卫二', '伽利略卫星']
+    ['行星', '气态巨行星', '大红斑', '木卫二', '伽利略卫星'],
+    { kind: 'gas', radius: 2.1, seed: 55, axialTilt: 3.1, rotationSpeed: 0.5, gasColors: ['#e6c9a0', '#c08a5e', '#a86b4a', '#f0e2c8'], gasSpot: { x: 0.7, y: 0.68, rx: 0.09, ry: 0.05, color: '#c85a3a' } }
   ),
 
   e(
@@ -160,7 +165,8 @@ export const catalog: CatalogEntry[] = [
       { label: '平均温度', value: '约 -139 ℃' },
       { label: '卫星数', value: '146（已确认）' }
     ],
-    ['行星', '土星环', '气态巨行星', '泰坦', '卡西尼']
+    ['行星', '土星环', '气态巨行星', '泰坦', '卡西尼'],
+    { kind: 'gas', radius: 1.8, seed: 66, axialTilt: 26.7, rotationSpeed: 0.45, gasColors: ['#e8d5a8', '#d4b57a', '#b98f4e'], rings: { inner: 2.2, outer: 3.5, seed: 67, colors: ['#e8d5a8', '#d4b57a', '#b98f4e', '#f5e6c8'], gaps: [[0.5, 0.58]] } }
   ),
 
   e(
@@ -176,7 +182,8 @@ export const catalog: CatalogEntry[] = [
       { label: '自转轴倾角', value: '97.8°' },
       { label: '卫星数', value: '28' }
     ],
-    ['行星', '冰巨行星', '侧躺', '甲烷', '天王星环']
+    ['行星', '冰巨行星', '侧躺', '甲烷', '天王星环'],
+    { kind: 'ice', radius: 1.3, seed: 77, axialTilt: 97.8, rotationSpeed: -0.3, gasColors: ['#9ad9e8', '#7ec8dd', '#cdeef5'], rings: { inner: 1.7, outer: 2.4, seed: 78, tilt: 82, colors: ['#cdeef5', '#9ad9e8'] } }
   ),
 
   e(
@@ -192,7 +199,8 @@ export const catalog: CatalogEntry[] = [
       { label: '最高风速', value: '约 2,100 km/h' },
       { label: '卫星数', value: '16' }
     ],
-    ['行星', '冰巨行星', '数学预言', '海卫一', '大暗斑']
+    ['行星', '冰巨行星', '数学预言', '海卫一', '大暗斑'],
+    { kind: 'ice', radius: 1.25, seed: 88, axialTilt: 28.3, rotationSpeed: 0.35, gasColors: ['#4f7fd6', '#3a66c4', '#7fa9e8'], gasSpot: { x: 0.32, y: 0.36, rx: 0.08, ry: 0.045, color: '#1e3a70' } }
   ),
 
   e(
@@ -208,7 +216,8 @@ export const catalog: CatalogEntry[] = [
       { label: '平均温度', value: '约 -229 ℃' },
       { label: '卫星数', value: '5（最大为卡戎）' }
     ],
-    ['矮行星', '柯伊伯带', '新视野号', '汤博区', '卡戎']
+    ['矮行星', '柯伊伯带', '新视野号', '汤博区', '卡戎'],
+    { kind: 'rocky', radius: 0.55, seed: 99, axialTilt: 122.5, rotationSpeed: 0.1, land: ['#cbbfa8', '#a99f8a', '#e0d6c0'], polar: true, craters: 30, darkPatches: 8, darkColor: '#4a3a30', brightPatches: 6, brightColor: '#f7f2e6' }
   ),
 
   e(
@@ -221,6 +230,8 @@ export const catalog: CatalogEntry[] = [
       { label: 'M87* 距离', value: '5,500 万光年' },
       { label: '银河系中心', value: '人马座 A*（约 400 万倍太阳质量）' },
       { label: '事件视界半径', value: 'R = 2GM/c²（史瓦西半径）' },
+      { label: '光子环', value: '光线绕黑洞弯曲形成，约 2.6 Rs' },
+      { label: '吸积盘内缘', value: 'ISCO ≈ 3 Rs（非自转黑洞）' },
       { label: '首张照片', value: '2019 年（EHT）' },
       { label: '分类', value: '恒星级 / 中等质量 / 超大质量' }
     ],

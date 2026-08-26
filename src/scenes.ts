@@ -4,6 +4,7 @@ import {
   mulberry32,
   rockyTexture,
   gasTexture,
+  venusTexture,
   earthTexture,
   moonTexture,
   sunTexture,
@@ -26,12 +27,12 @@ export interface SceneHandle {
 }
 
 export interface PlanetParams {
-  kind: 'rocky' | 'gas' | 'earth' | 'ice'
+  kind: 'rocky' | 'gas' | 'earth' | 'ice' | 'venus'
   radius?: number
   seed?: number
   axialTilt?: number
   rotationSpeed?: number
-  rings?: { inner: number; outer: number; seed?: number; tilt?: number; colors: string[] }
+  rings?: { inner: number; outer: number; seed?: number; tilt?: number; colors: string[]; gaps?: [number, number][] }
   atmosphere?: string
   atmosphereOpacity?: number
   cloud?: boolean
@@ -39,7 +40,12 @@ export interface PlanetParams {
   ocean?: string
   polar?: boolean
   craters?: number
+  darkPatches?: number
+  darkColor?: string
+  brightPatches?: number
+  brightColor?: string
   gasColors?: string[]
+  gasSpot?: { x: number; y: number; rx: number; ry: number; color: string }
 }
 
 // ------------------------------------------------------------------ shared
@@ -134,10 +140,17 @@ function makeAtmosphere(radius: number, color: string, intensity = 0.5): THREE.M
   return new THREE.Mesh(geo, mat)
 }
 
-function makeRings(inner: number, outer: number, seed: number, colors: string[], tiltDeg = 0): THREE.Mesh {
+function makeRings(
+  inner: number,
+  outer: number,
+  seed: number,
+  colors: string[],
+  tiltDeg = 0,
+  gaps: [number, number][] = []
+): THREE.Mesh {
   const geo = new THREE.RingGeometry(inner, outer, 128, 1)
   const mat = new THREE.MeshBasicMaterial({
-    map: ringTexture(inner, outer, seed, colors),
+    map: ringTexture(inner, outer, seed, colors, gaps),
     side: THREE.DoubleSide,
     transparent: true,
     depthWrite: false
@@ -176,18 +189,24 @@ export function buildPlanetScene(p: PlanetParams): SceneHandle {
   group.add(tilt)
 
   let map: THREE.Texture
-  if (p.kind === 'earth') {
+  if (p.kind === 'venus') {
+    map = venusTexture(seed)
+  } else if (p.kind === 'earth') {
     map = earthTexture(seed)
   } else if (p.kind === 'gas') {
-    map = gasTexture(seed, p.gasColors ?? ['#e6c9a0', '#c08a5e', '#a86b4a', '#f0e2c8'])
+    map = gasTexture(seed, p.gasColors ?? ['#e6c9a0', '#c08a5e', '#a86b4a', '#f0e2c8'], { spot: p.gasSpot })
   } else if (p.kind === 'ice') {
-    map = gasTexture(seed, p.gasColors ?? ['#9ad9e8', '#7ec8dd', '#cdeef5'])
+    map = gasTexture(seed, p.gasColors ?? ['#9ad9e8', '#7ec8dd', '#cdeef5'], { spot: p.gasSpot })
   } else {
     map = rockyTexture(seed, {
       land: p.land ?? ['#a89070', '#8a7358', '#c0a88a', '#7a5f45', '#d8c8ac'],
       ocean: p.ocean,
       polar: p.polar ?? false,
-      craters: p.craters ?? 0
+      craters: p.craters ?? 0,
+      darkPatches: p.darkPatches,
+      darkColor: p.darkColor,
+      brightPatches: p.brightPatches,
+      brightColor: p.brightColor
     })
   }
   const mat = new THREE.MeshStandardMaterial({ map, roughness: 1, metalness: 0 })
@@ -208,7 +227,7 @@ export function buildPlanetScene(p: PlanetParams): SceneHandle {
     tilt.add(makeAtmosphere(radius * 1.05, p.atmosphere, p.atmosphereOpacity ?? 0.55))
   }
   if (p.rings) {
-    group.add(makeRings(p.rings.inner, p.rings.outer, p.rings.seed ?? seed, p.rings.colors, p.rings.tilt ?? 0))
+    group.add(makeRings(p.rings.inner, p.rings.outer, p.rings.seed ?? seed, p.rings.colors, p.rings.tilt ?? 0, p.rings.gaps))
   }
   group.add(makeStarfield(900))
 
@@ -223,7 +242,6 @@ export function buildPlanetScene(p: PlanetParams): SceneHandle {
     maxDistance: radius * 8
   }
 }
-
 export function buildSunScene(): SceneHandle {
   const group = new THREE.Group()
   const mat = new THREE.ShaderMaterial({
@@ -253,19 +271,33 @@ export function buildSunScene(): SceneHandle {
         float a = 0.5;
         for (int i = 0; i < 5; i++) {
           v += a * noise(p);
-          p *= 2.03;
+          p *= 2.1;
           a *= 0.5;
         }
         return v;
       }
       void main() {
-        vec2 uv = vUv * 5.0;
-        float n = fbm(uv + vec2(uTime * 0.05, uTime * 0.03));
-        float n2 = fbm(uv * 2.2 - vec2(uTime * 0.04, 0.0) + n * 1.6);
-        vec3 c = mix(vec3(1.0, 0.42, 0.05), vec3(1.0, 0.78, 0.15), smoothstep(0.35, 0.75, n));
-        c = mix(c, vec3(1.0, 0.95, 0.62), smoothstep(0.7, 0.95, n2));
-        c += vec3(1.0, 0.5, 0.1) * 0.2 * pow(n, 3.0);
-        gl_FragColor = vec4(c, 1.0);
+        // 太阳光球：米粒组织（对流胞）叠加多尺度湍流
+        vec2 uv = vUv * 10.0;
+        float gran = fbm(uv + vec2(uTime * 0.06, uTime * 0.03));
+        float gran2 = fbm(uv * 2.4 - vec2(uTime * 0.05, 0.0) + gran * 1.4);
+        vec3 cold = vec3(0.85, 0.30, 0.05);
+        vec3 warm = vec3(1.0, 0.58, 0.16);
+        vec3 hot = vec3(1.0, 0.88, 0.50);
+        vec3 col = mix(cold, warm, smoothstep(0.30, 0.68, gran));
+        col = mix(col, hot, smoothstep(0.62, 0.92, gran2));
+
+        // 黑子：较冷（暗）的强磁区，缓慢演化
+        vec2 sp = vec2(0.30 + 0.20 * sin(uTime * 0.05), 0.58 + 0.08 * cos(uTime * 0.07));
+        float sd = length((vUv - sp) * vec2(3.2, 7.0));
+        float penumbra = 1.0 - smoothstep(0.02, 0.35, sd);
+        col *= 1.0 - 0.55 * penumbra;
+
+        // 临边昏暗：光球边缘比中心暗（真实太阳的重要特征）
+        float r = length(vUv - 0.5) * 2.0;
+        float limb = 1.0 - 0.62 * pow(r, 2.8);
+        col *= limb;
+        gl_FragColor = vec4(col, 1.0);
       }
     `,
     uniforms: { uTime: { value: 0 } }
@@ -279,15 +311,15 @@ export function buildSunScene(): SceneHandle {
       size: 0.09,
       color: 0xffa040,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.45,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
   )
   group.add(corona)
 
-  const glow1 = makeGlowSprite('#ff8c1a', 5.2, 0.55)
-  const glow2 = makeGlowSprite('#ffb84d', 9, 0.22)
+  const glow1 = makeGlowSprite('#ff8c1a', 5.2, 0.5)
+  const glow2 = makeGlowSprite('#ffb84d', 9, 0.2)
   group.add(glow1, glow2)
   group.add(makeStarfield(900))
 
@@ -298,15 +330,13 @@ export function buildSunScene(): SceneHandle {
       sun.rotation.y += dt * 0.06
       corona.rotation.y += dt * 0.02
       corona.rotation.x += dt * 0.008
-      const pulse = 1 + 0.04 * Math.sin(t * 1.6)
-      glow1.scale.setScalar(5.2 * pulse)
+      glow1.scale.setScalar(5.2 * (1 + 0.04 * Math.sin(t * 1.6)))
     },
     camera: { position: [0, 1.2, 5.8] },
     minDistance: 2,
     maxDistance: 14
   }
 }
-
 export function buildMoonScene(): SceneHandle {
   const group = new THREE.Group()
   const mat = new THREE.MeshStandardMaterial({ map: moonTexture(9), roughness: 1 })
@@ -326,21 +356,30 @@ export function buildMoonScene(): SceneHandle {
 
 export function buildBlackholeScene(): SceneHandle {
   const group = new THREE.Group()
-  group.add(makeStarfield(1600))
+  group.add(makeStarfield(1800))
 
+  // 事件视界（史瓦西半径 Rs = 1 个长度单位）
   const horizon = new THREE.Mesh(
     new THREE.SphereGeometry(1, 48, 48),
     new THREE.MeshBasicMaterial({ color: 0x000000 })
   )
   group.add(horizon)
 
+  // 黑洞阴影：非自转黑洞的阴影半径约为 2.6 Rs（由光线弯曲造成）
+  const shadow = new THREE.Mesh(
+    new THREE.SphereGeometry(2.6, 64, 64),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.98 })
+  )
+  group.add(shadow)
+
+  // 光子环：临界光线环绕黑洞形成的亮环，位于阴影边缘
   const photonRing = new THREE.Mesh(
-    new THREE.RingGeometry(1.02, 1.12, 128),
+    new THREE.RingGeometry(2.56, 2.7, 180),
     new THREE.MeshBasicMaterial({
-      color: 0xfff4d8,
+      color: 0xfff2d8,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.9,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -348,6 +387,7 @@ export function buildBlackholeScene(): SceneHandle {
   photonRing.rotation.x = Math.PI / 2 - 0.38
   group.add(photonRing)
 
+  // 吸积盘：内缘取最内稳定圆轨道 ISCO ≈ 3 Rs（史瓦西黑洞）
   const diskMat = new THREE.ShaderMaterial({
     vertexShader: `
       varying vec3 vPos;
@@ -374,20 +414,21 @@ export function buildBlackholeScene(): SceneHandle {
         vec2 p = vPos.xy;
         float r = length(p);
         float a = atan(p.y, p.x);
-        float inR = 1.18;
-        float outR = 3.4;
+        float inR = 3.0;
+        float outR = 11.0;
         float radial = clamp((r - inR) / (outR - inR), 0.0, 1.0);
         vec3 inner = vec3(1.0, 0.96, 0.86);
         vec3 mid = vec3(1.0, 0.55, 0.15);
-        vec3 outer = vec3(0.45, 0.08, 0.02);
-        vec3 col = mix(inner, mid, smoothstep(0.0, 0.35, radial));
-        col = mix(col, outer, smoothstep(0.35, 1.0, radial));
-        float n = noise(vec2(r * 8.0, a * 4.0) + vec2(uTime * 0.35, uTime * 0.2));
+        vec3 outer = vec3(0.42, 0.07, 0.02);
+        vec3 col = mix(inner, mid, smoothstep(0.0, 0.3, radial));
+        col = mix(col, outer, smoothstep(0.3, 1.0, radial));
+        float n = noise(vec2(r * 6.0, a * 5.0) + vec2(uTime * 0.3, uTime * 0.18));
         col *= 0.72 + 0.55 * n;
-        float beam = 1.0 + 0.5 * sin(a - uTime * 1.5);
+        // 多普勒束流：朝向我们运动的一侧更亮
+        float beam = 1.0 + 0.55 * sin(a - uTime * 1.4);
         col *= beam;
-        float alpha = smoothstep(0.0, 0.1, radial) * (1.0 - smoothstep(0.82, 1.0, radial));
-        gl_FragColor = vec4(col, alpha * 0.95);
+        float alpha = smoothstep(0.0, 0.06, radial) * (1.0 - smoothstep(0.8, 1.0, radial));
+        gl_FragColor = vec4(col, alpha * 0.92);
       }
     `,
     uniforms: { uTime: { value: 0 } },
@@ -396,25 +437,25 @@ export function buildBlackholeScene(): SceneHandle {
     depthWrite: false,
     blending: THREE.AdditiveBlending
   })
-  const disk = new THREE.Mesh(new THREE.RingGeometry(1.18, 3.4, 128, 1), diskMat)
+  const disk = new THREE.Mesh(new THREE.RingGeometry(3.0, 11.0, 160, 1), diskMat)
   const diskPivot = new THREE.Group()
   diskPivot.rotation.x = Math.PI / 2 - 0.38
   diskPivot.add(disk)
   group.add(diskPivot)
 
-  const halo = makeGlowSprite('#ffaa55', 4.4, 0.28)
+  const halo = makeGlowSprite('#ffaa55', 12, 0.14)
   group.add(halo)
 
   return {
     group,
     update: (t, dt) => {
       diskMat.uniforms.uTime.value = t
-      disk.rotation.z += dt * 0.7
-      halo.scale.setScalar(4.4 * (1 + 0.03 * Math.sin(t * 2)))
+      disk.rotation.z += dt * 0.5
+      halo.scale.setScalar(12 * (1 + 0.03 * Math.sin(t * 2)))
     },
-    camera: { position: [0, 3.4, 8.2] },
-    minDistance: 2.5,
-    maxDistance: 20
+    camera: { position: [0, 6.5, 19] },
+    minDistance: 4,
+    maxDistance: 50
   }
 }
 
@@ -438,19 +479,21 @@ export function buildCometScene(): SceneHandle {
   const coma = makeGlowSprite('#bff3ff', 3.2, 0.35)
   group.add(coma)
 
-  const dustPos = new Float32Array(600 * 3)
-  const dustCol = new Float32Array(600 * 3)
-  for (let i = 0; i < 600; i++) {
+  // 尘埃尾：宽、黄白、沿轨道向后弯曲（太阳风/辐射压作用下滞后）
+  const dustPos = new Float32Array(700 * 3)
+  const dustCol = new Float32Array(700 * 3)
+  for (let i = 0; i < 700; i++) {
     const t = Math.pow(rng(), 1.7)
-    const x = -(0.7 + t * 13)
+    const x = -(0.7 + t * 14)
     const s = t * 3.4 * (0.25 + rng() * 0.75)
+    const lag = 0.045 * x * x
     dustPos[i * 3] = x
-    dustPos[i * 3 + 1] = (rng() - 0.5) * s
+    dustPos[i * 3 + 1] = (rng() - 0.5) * s + lag
     dustPos[i * 3 + 2] = (rng() - 0.5) * s
     const mix = t
     dustCol[i * 3] = 1
-    dustCol[i * 3 + 1] = 0.95 - mix * 0.4
-    dustCol[i * 3 + 2] = 0.88 - mix * 0.55
+    dustCol[i * 3 + 1] = 0.94 - mix * 0.4
+    dustCol[i * 3 + 2] = 0.86 - mix * 0.55
   }
   const dustGeo = new THREE.BufferGeometry()
   dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3))
@@ -468,12 +511,13 @@ export function buildCometScene(): SceneHandle {
   )
   group.add(dust)
 
-  const ionPos = new Float32Array(420 * 3)
-  const ionCol = new Float32Array(420 * 3)
-  for (let i = 0; i < 420; i++) {
+  // 离子尾：窄、偏蓝、沿太阳风方向几乎笔直背离太阳（此处太阳在 +X 方向）
+  const ionPos = new Float32Array(460 * 3)
+  const ionCol = new Float32Array(460 * 3)
+  for (let i = 0; i < 460; i++) {
     const t = Math.pow(rng(), 1.9)
-    const x = -(0.8 + t * 18)
-    const s = t * 0.9
+    const x = -(0.8 + t * 19)
+    const s = t * 0.85
     ionPos[i * 3] = x
     ionPos[i * 3 + 1] = (rng() - 0.5) * s * 1.6
     ionPos[i * 3 + 2] = (rng() - 0.5) * s
@@ -496,6 +540,11 @@ export function buildCometScene(): SceneHandle {
     })
   )
   group.add(ion)
+
+  // 太阳方向指示（示意光源方向）
+  const sunLight = makeGlowSprite('#fff2c8', 2.4, 0.5)
+  sunLight.position.x = 9
+  group.add(sunLight)
   group.add(makeStarfield(900))
 
   return {
@@ -505,9 +554,9 @@ export function buildCometScene(): SceneHandle {
       nucleus.rotation.x += dt * 0.12
       coma.scale.setScalar(3.2 * (1 + 0.06 * Math.sin(t * 1.8)))
     },
-    camera: { position: [0, 1.7, 7] },
+    camera: { position: [0, 2.2, 7.5] },
     minDistance: 1.8,
-    maxDistance: 18
+    maxDistance: 22
   }
 }
 
@@ -572,28 +621,45 @@ export function buildNebulaScene(): SceneHandle {
 
 export function buildGalaxyScene(): SceneHandle {
   const group = new THREE.Group()
-  const count = 9000
+  const count = 9500
   const positions = new Float32Array(count * 3)
   const colors = new Float32Array(count * 3)
   const rng = mulberry32(314)
+
   for (let i = 0; i < count; i++) {
-    const arm = i % 4
-    const t = i / count
-    const r = 0.6 + 4.6 * Math.pow(t, 0.75)
-    const theta = r * 1.15 + arm * (Math.PI / 2) + (rng() - 0.5) * 0.32
-    const spread = 0.25 * (0.25 + r * 0.3)
-    positions[i * 3] = Math.cos(theta) * r + (rng() - 0.5) * spread
-    positions[i * 3 + 1] = (rng() - 0.5) * (0.16 + r * 0.14)
-    positions[i * 3 + 2] = Math.sin(theta) * r + (rng() - 0.5) * spread
-    const b = 0.5 + rng() * 0.5
-    if (r < 1.3) {
+    // 中央棒结构：银河系是棒旋星系，核心为延展的棒
+    if (i < count * 0.28) {
+      const bx = (rng() - 0.5) * 2.6
+      const by = (rng() - 0.5) * 0.38
+      const bz = (rng() - 0.5) * 0.38
+      positions[i * 3] = bx
+      positions[i * 3 + 1] = by
+      positions[i * 3 + 2] = bz
+      const b = 0.65 + rng() * 0.35
       colors[i * 3] = 1 * b
-      colors[i * 3 + 1] = 0.92 * b
-      colors[i * 3 + 2] = 0.75 * b
+      colors[i * 3 + 1] = 0.88 * b
+      colors[i * 3 + 2] = 0.68 * b
+      continue
+    }
+    const arm = i % 2
+    const t = i / count
+    const r = 0.9 + 4.8 * Math.pow(t, 0.75)
+    const theta = r * 1.05 + arm * Math.PI + (rng() - 0.5) * 0.3
+    const spread = 0.22 * (0.25 + r * 0.3)
+    positions[i * 3] = Math.cos(theta) * r + (rng() - 0.5) * spread
+    positions[i * 3 + 1] = (rng() - 0.5) * (0.16 + r * 0.12)
+    positions[i * 3 + 2] = Math.sin(theta) * r + (rng() - 0.5) * spread
+
+    const b = 0.5 + rng() * 0.5
+    if (r < 1.4) {
+      colors[i * 3] = 1 * b
+      colors[i * 3 + 1] = 0.9 * b
+      colors[i * 3 + 2] = 0.72 * b
     } else {
-      const blue = 0.55 + rng() * 0.45
-      colors[i * 3] = 0.55 * b
-      colors[i * 3 + 1] = 0.68 * b
+      // 旋臂以年轻蓝色恒星为主，外缘含粉红恒星形成区
+      const blue = 0.6 + rng() * 0.4
+      colors[i * 3] = 0.45 + rng() * 0.25
+      colors[i * 3 + 1] = 0.6 * b
       colors[i * 3 + 2] = blue * b
     }
   }
@@ -631,7 +697,7 @@ export function buildGalaxyScene(): SceneHandle {
 export function buildMeteorScene(): SceneHandle {
   const group = new THREE.Group()
   group.add(makeStarfield(1000))
-  const N = 40
+  const N = 42
   interface Meteor {
     pos: THREE.Vector3
     dir: THREE.Vector3
@@ -645,13 +711,20 @@ export function buildMeteorScene(): SceneHandle {
   }
   const meteors: Meteor[] = []
   const headTex = glowTexture('#fff3c0')
+  // 辐射点：所有流星的轨迹反向延长后交汇于此
+  const radiant = new THREE.Vector3(0.55, 0.85, -0.15).normalize()
+  const radPos = radiant.clone().multiplyScalar(46)
 
   function spawn(m: Meteor) {
-    m.dir = new THREE.Vector3().randomDirection()
-    m.pos.copy(m.dir).multiplyScalar(38 + Math.random() * 26)
-    m.speed = 18 + Math.random() * 16
+    m.pos.copy(radPos).add(new THREE.Vector3().randomDirection().multiplyScalar(4.5))
+    m.dir = radiant
+      .clone()
+      .multiplyScalar(-1)
+      .add(new THREE.Vector3().randomDirection().multiplyScalar(0.16))
+      .normalize()
+    m.speed = 20 + Math.random() * 14
     m.age = 0
-    m.life = 1.6 + Math.random() * 1.6
+    m.life = 1.5 + Math.random() * 1.6
   }
 
   for (let i = 0; i < N; i++) {
@@ -662,7 +735,7 @@ export function buildMeteorScene(): SceneHandle {
       depthWrite: false
     })
     const head = new THREE.Sprite(headMat)
-    head.scale.setScalar(0.55)
+    head.scale.setScalar(0.5)
     const lineGeo = new THREE.BufferGeometry()
     lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3))
     const lineMat = new THREE.LineBasicMaterial({
@@ -686,7 +759,7 @@ export function buildMeteorScene(): SceneHandle {
         m.pos.addScaledVector(m.dir, m.speed * dt)
         m.age += dt
         const fade = 1 - m.age / m.life
-        const len = 1.4 + m.speed * 0.05
+        const len = 1.3 + m.speed * 0.05
         const p0 = m.pos
         const p1 = m.pos.clone().addScaledVector(m.dir, -len)
         const attr = m.line.geometry.attributes.position as THREE.BufferAttribute
@@ -696,7 +769,7 @@ export function buildMeteorScene(): SceneHandle {
         m.head.position.copy(m.pos)
         m.headMat.opacity = Math.max(0, fade)
         m.lineMat.opacity = Math.max(0, fade * 0.9)
-        if (m.age > m.life || m.pos.length() < 7) spawn(m)
+        if (m.age > m.life || m.pos.length() < 6) spawn(m)
       }
     },
     camera: { position: [0, 2.2, 13] },
@@ -717,6 +790,11 @@ export function buildEclipseScene(): SceneHandle {
   sunGlow.position.x = -9
   group.add(sunGlow)
 
+  // 日冕：全食时太阳光球被遮挡，日冕才清晰可见
+  const corona = makeGlowSprite('#fff6e0', 4.4, 0.12)
+  corona.position.x = -9
+  group.add(corona)
+
   const earth = new THREE.Mesh(
     new THREE.SphereGeometry(0.6, 48, 48),
     new THREE.MeshStandardMaterial({ map: earthTexture(5), roughness: 1 })
@@ -733,8 +811,20 @@ export function buildEclipseScene(): SceneHandle {
   moonPivot.add(moon)
   group.add(moonPivot)
 
+  // 地球表面的本影斑
   const shadow = makeCircleSprite('#000000', 0.3, 0)
   group.add(shadow)
+
+  // 月球背后的本影锥：全食带由月影扫过地表形成
+  const umbraMat = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  })
+  const umbra = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.8, 32, 1, true), umbraMat)
+  group.add(umbra)
 
   const light = new THREE.DirectionalLight(0xfff2d0, 2)
   light.position.set(-9, 1.5, 1)
@@ -743,7 +833,7 @@ export function buildEclipseScene(): SceneHandle {
   let angle = 0
   return {
     group,
-    update: (t, dt) => {
+    update: (_t, dt) => {
       angle += dt * 0.42
       moonPivot.rotation.z = angle
       const moonX = Math.cos(angle) * 1.8
@@ -752,13 +842,18 @@ export function buildEclipseScene(): SceneHandle {
       const alignment = Math.abs(Math.sin(angle))
       const inFront = Math.cos(angle) > 0
       const amt = inFront ? Math.max(0, 1 - alignment / 0.3) : 0
+
       sunMat.color.setHSL(0.09, 0.85, 0.62 - amt * 0.5)
       sunGlow.material.opacity = 0.7 - amt * 0.55
+      corona.material.opacity = 0.12 + amt * 0.75
       shadow.position.set(0.28, 0, 0)
       shadow.material.opacity = amt * 0.9
-      if (t > 0 && alignment < 0.02) {
-        // nothing — keep animation looping
-      }
+
+      const moonPos = new THREE.Vector3(moonX, moonY, 0)
+      const dirToEarth = moonPos.clone().negate().normalize()
+      umbra.position.copy(moonPos).addScaledVector(dirToEarth, 0.9)
+      umbra.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirToEarth)
+      umbraMat.opacity = amt * 0.4
     },
     camera: { position: [4.6, 3.4, 8.6] },
     minDistance: 2,
@@ -813,10 +908,14 @@ export function buildAuroraScene(): SceneHandle {
         float curtain = smoothstep(0.4, 0.78, n);
         float mask = smoothstep(0.0, 0.22, uv.y) * (1.0 - smoothstep(0.55, 0.95, uv.y));
         float wavy = 0.6 + 0.4 * sin(uv.x * 6.0 + uTime * 0.9);
-        float pick = fbm(vec2(uv.x * 2.0, uv.y * 3.0) + uTime * 0.12);
+
+        // 极光颜色随高度分层：低层氮分子呈蓝/紫，中层氧原子呈绿，高层氧原子呈红
+        float h = uv.y;
+        vec3 blue = vec3(0.45, 0.50, 1.0);
         vec3 green = vec3(0.2, 1.0, 0.55);
-        vec3 purple = vec3(0.65, 0.35, 1.0);
-        vec3 col = mix(green, purple, smoothstep(0.3, 0.85, pick));
+        vec3 red = vec3(1.0, 0.22, 0.38);
+        vec3 col = mix(blue, green, smoothstep(0.12, 0.42, h));
+        col = mix(col, red, smoothstep(0.58, 0.88, h));
         float alpha = curtain * mask * wavy * 0.9;
         gl_FragColor = vec4(col, alpha);
       }
@@ -871,7 +970,7 @@ export function buildSupernovaScene(): SceneHandle {
     const pts = new THREE.Points(geo, mat)
     pts.scale.setScalar(0.5)
     group.add(pts)
-    return { pts, mat, base: dirs.length }
+    return { pts, mat }
   }
 
   const s1 = shell(dirs1, 0xffc48a, 0.16)
@@ -881,6 +980,10 @@ export function buildSupernovaScene(): SceneHandle {
   group.add(core)
   const flash = makeGlowSprite('#ffe9c0', 5, 0.9)
   group.add(flash)
+
+  // 爆后遗迹：中子星（脉冲星）留在中心
+  const pulsar = makeGlowSprite('#bfe9ff', 0.5, 0)
+  group.add(pulsar)
   group.add(makeStarfield(900))
 
   const T = 8
@@ -895,9 +998,13 @@ export function buildSupernovaScene(): SceneHandle {
       s1.mat.opacity = p < 0.12 ? p / 0.12 : Math.max(0, 1 - (p - 0.12) / 0.88) * 0.85
       s2.mat.opacity = p < 0.22 ? 0 : Math.max(0, 1 - (p - 0.22) / 0.78) * 0.7
       core.scale.setScalar(1.2 + p * 2.4)
-      core.material.opacity = Math.max(0, 1 - p * 1.2)
+      core.material.opacity = Math.max(0, 1 - p * 1.6)
       flash.scale.setScalar(4 + p * 16)
       flash.material.opacity = p < 0.08 ? p / 0.08 : Math.max(0, 1 - p) * 0.7
+      // 中子星在抛射物散开后显现，并快速脉冲
+      const appear = Math.min(1, Math.max(0, (p - 0.55) / 0.15))
+      pulsar.material.opacity = appear
+      pulsar.scale.setScalar(0.5 + 0.12 * Math.sin(t * 22) * appear)
     },
     camera: { position: [0, 0.4, 9.5] },
     minDistance: 2.5,
@@ -908,30 +1015,38 @@ export function buildSupernovaScene(): SceneHandle {
 export function buildSolarSystemScene(): SceneHandle {
   const group = new THREE.Group()
   const rng = mulberry32(1234)
-  interface PlanetSpec {
+
+  interface SolarPlanet {
     name: string
+    kind: 'rocky' | 'gas' | 'earth' | 'ice' | 'venus'
     r: number
-    dist: number
-    speed: number
-    kind: 'rocky' | 'gas' | 'earth' | 'ice'
+    au: number
+    period: number
+    tilt: number
+    retrograde?: boolean
     seed: number
     land?: string[]
     ocean?: string
     polar?: boolean
     craters?: number
+    darkPatches?: number
+    darkColor?: string
     gasColors?: string[]
+    gasSpot?: { x: number; y: number; rx: number; ry: number; color: string }
     rings?: boolean
-    tilt?: number
+    ringTilt?: number
+    ringGaps?: [number, number][]
   }
-  const planets: PlanetSpec[] = [
-    { name: '水星', r: 0.2, dist: 3.2, speed: 1.6, kind: 'rocky' as const, seed: 11, land: ['#b5a99a', '#968b7e', '#cfc4b2'], polar: true, craters: 40 },
-    { name: '金星', r: 0.28, dist: 4.2, speed: 1.17, kind: 'rocky' as const, seed: 22, land: ['#e8c87e', '#d9b05f', '#f2ddab'], ocean: '#d9a94f' },
-    { name: '地球', r: 0.3, dist: 5.4, speed: 1, kind: 'earth' as const, seed: 33 },
-    { name: '火星', r: 0.24, dist: 6.6, speed: 0.8, kind: 'rocky' as const, seed: 44, land: ['#c1553b', '#a3432c', '#d97b5a'], polar: true, craters: 20 },
-    { name: '木星', r: 0.62, dist: 8.8, speed: 0.44, kind: 'gas' as const, seed: 55, gasColors: ['#e6c9a0', '#c08a5e', '#a86b4a', '#f0e2c8'] },
-    { name: '土星', r: 0.55, dist: 11, speed: 0.32, kind: 'gas' as const, seed: 66, gasColors: ['#e8d5a8', '#d4b57a', '#b98f4e'], rings: true },
-    { name: '天王星', r: 0.38, dist: 13.4, speed: 0.23, kind: 'ice' as const, seed: 77, gasColors: ['#9ad9e8', '#7ec8dd', '#cdeef5'], rings: true, tilt: 82 },
-    { name: '海王星', r: 0.36, dist: 15.6, speed: 0.18, kind: 'ice' as const, seed: 88, gasColors: ['#4f7fd6', '#3a66c4', '#7fa9e8'] }
+
+  const planets: SolarPlanet[] = [
+    { name: '水星', kind: 'rocky', r: 0.24, au: 0.387, period: 0.241, tilt: 0.03, seed: 11, land: ['#a8a29a', '#8f887f', '#c4bcb2'], polar: true, craters: 70 },
+    { name: '金星', kind: 'venus', r: 0.3, au: 0.723, period: 0.615, tilt: 177.4, retrograde: true, seed: 22 },
+    { name: '地球', kind: 'earth', r: 0.32, au: 1.0, period: 1.0, tilt: 23.4, seed: 33 },
+    { name: '火星', kind: 'rocky', r: 0.27, au: 1.524, period: 1.881, tilt: 25.2, seed: 44, land: ['#c1553b', '#a3432c', '#d97b5a', '#8f3a26'], polar: true, craters: 30, darkPatches: 14, darkColor: '#3a2f28' },
+    { name: '木星', kind: 'gas', r: 0.62, au: 5.203, period: 11.86, tilt: 3.1, seed: 55, gasColors: ['#e6c9a0', '#c08a5e', '#a86b4a', '#f0e2c8'], gasSpot: { x: 0.7, y: 0.68, rx: 0.09, ry: 0.05, color: '#c85a3a' } },
+    { name: '土星', kind: 'gas', r: 0.55, au: 9.537, period: 29.46, tilt: 26.7, seed: 66, gasColors: ['#e8d5a8', '#d4b57a', '#b98f4e'], rings: true, ringGaps: [[0.5, 0.58]] },
+    { name: '天王星', kind: 'ice', r: 0.4, au: 19.19, period: 84.01, tilt: 97.8, retrograde: true, seed: 77, gasColors: ['#9ad9e8', '#7ec8dd', '#cdeef5'], rings: true, ringTilt: 82 },
+    { name: '海王星', kind: 'ice', r: 0.38, au: 30.07, period: 164.8, tilt: 28.3, seed: 88, gasColors: ['#4f7fd6', '#3a66c4', '#7fa9e8'], gasSpot: { x: 0.32, y: 0.36, rx: 0.08, ry: 0.045, color: '#1e3a70' } }
   ]
 
   const sun = new THREE.Mesh(
@@ -942,10 +1057,11 @@ export function buildSolarSystemScene(): SceneHandle {
   group.add(makeGlowSprite('#ffc46b', 3.4, 0.65))
 
   const orbits = planets.map((p) => {
+    const dist = 3 + Math.log10(p.au / 0.387) * 5.6
     const pts: THREE.Vector3[] = []
     for (let i = 0; i <= 96; i++) {
       const a = (i / 96) * Math.PI * 2
-      pts.push(new THREE.Vector3(Math.cos(a) * p.dist, 0, Math.sin(a) * p.dist))
+      pts.push(new THREE.Vector3(Math.cos(a) * dist, 0, Math.sin(a) * dist))
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts)
     const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.14 }))
@@ -954,20 +1070,22 @@ export function buildSolarSystemScene(): SceneHandle {
   })
 
   const meshes = planets.map((p) => {
+    const dist = 3 + Math.log10(p.au / 0.387) * 5.6
     let map: THREE.Texture
-    if (p.kind === 'earth') map = earthTexture(p.seed)
-    else if (p.kind === 'gas') map = gasTexture(p.seed, p.gasColors!)
-    else if (p.kind === 'ice') map = gasTexture(p.seed, p.gasColors!)
-    else map = rockyTexture(p.seed, { land: p.land ?? ['#a89070'], ocean: p.ocean, polar: p.polar, craters: p.craters })
+    if (p.kind === 'venus') map = venusTexture(p.seed)
+    else if (p.kind === 'earth') map = earthTexture(p.seed)
+    else if (p.kind === 'gas' || p.kind === 'ice') map = gasTexture(p.seed, p.gasColors!, { spot: p.gasSpot })
+    else map = rockyTexture(p.seed, { land: p.land!, ocean: p.ocean, polar: p.polar, craters: p.craters, darkPatches: p.darkPatches, darkColor: p.darkColor })
+
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(p.r, 40, 40), new THREE.MeshStandardMaterial({ map, roughness: 1 }))
     const holder = new THREE.Group()
+    holder.rotation.z = THREE.MathUtils.degToRad(p.tilt)
     holder.add(mesh)
     if (p.rings) {
-      const tilt = p.tilt ?? 0
-      holder.add(makeRings(p.r * 1.4, p.r * 2.3, p.seed + 1, ['#e8d5a8', '#d4b57a', '#b98f4e'], tilt))
+      holder.add(makeRings(p.r * 1.4, p.r * 2.3, p.seed + 1, ['#e8d5a8', '#d4b57a', '#b98f4e'], p.ringTilt ?? 0, p.ringGaps))
     }
     group.add(holder)
-    return { mesh, holder, p, angle: rng() * Math.PI * 2 }
+    return { mesh, holder, p, dist, angle: rng() * Math.PI * 2 }
   })
 
   group.add(makeStarfield(1200))
@@ -976,9 +1094,10 @@ export function buildSolarSystemScene(): SceneHandle {
     group,
     update: (_t, dt) => {
       for (const m of meshes) {
-        m.angle += dt * m.p.speed * 0.14
-        m.holder.position.set(Math.cos(m.angle) * m.p.dist, 0, Math.sin(m.angle) * m.p.dist)
-        m.mesh.rotation.y += dt * 0.5
+        // 角速度与真实公转周期成反比
+        m.angle += dt * (0.28 / m.p.period) * (m.p.retrograde ? -1 : 1)
+        m.holder.position.set(Math.cos(m.angle) * m.dist, 0, Math.sin(m.angle) * m.dist)
+        m.mesh.rotation.y += dt * 0.5 * (m.p.retrograde ? -1 : 1)
       }
       sun.rotation.y += dt * 0.1
     },
