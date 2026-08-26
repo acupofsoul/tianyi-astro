@@ -1,13 +1,18 @@
 import { searchCatalog } from '../catalog'
 import { el } from './dom'
 
-export function mountSearch(container: HTMLElement, opts?: { query?: string; onInput?: (q: string) => void }) {
+export function mountSearch(
+  container: HTMLElement,
+  opts?: { query?: string; onInput?: (q: string) => void; inputId?: string; suggestId?: string }
+) {
+  const inputId = opts?.inputId ?? 'global-search'
+  const suggestId = opts?.suggestId ?? inputId + '-suggest'
   container.innerHTML = `
-    <input id="global-search" type="search" placeholder="搜索：黑洞、土星、哈雷彗星、极光…" autocomplete="off" />
-    <div class="suggest" id="search-suggest"></div>
+    <input id="${inputId}" type="search" placeholder="搜索：黑洞、土星、哈雷彗星、极光…" autocomplete="off" />
+    <div class="suggest" id="${suggestId}"></div>
   `
-  const input = container.querySelector<HTMLInputElement>('#global-search')!
-  const suggest = container.querySelector<HTMLElement>('#search-suggest')!
+  const input = container.querySelector<HTMLInputElement>('#' + inputId)!
+  const suggest = container.querySelector<HTMLElement>('#' + suggestId)!
   let q = ''
 
   function renderSuggest() {
