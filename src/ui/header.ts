@@ -5,12 +5,12 @@ const navLinks: [string, string][] = [
   ['首页', '#/'],
   ['目录', '#/browse'],
   ['天文史', '#/timeline'],
-  ['太阳系', '#/?cat=太阳系'],
-  ['行星', '#/?cat=行星'],
-  ['卫星', '#/?cat=卫星'],
-  ['矮行星', '#/?cat=矮行星'],
-  ['深空天体', '#/?cat=深空天体'],
-  ['天文现象', '#/?cat=天文现象']
+  ['太阳系', '#/browse?cat=太阳系'],
+  ['行星', '#/browse?cat=行星'],
+  ['卫星', '#/browse?cat=卫星'],
+  ['矮行星', '#/browse?cat=矮行星'],
+  ['深空天体', '#/browse?cat=深空天体'],
+  ['天文现象', '#/browse?cat=天文现象']
 ]
 
 export function renderSiteHeader(opts?: { query?: string; onInput?: (q: string) => void }): HTMLElement {
