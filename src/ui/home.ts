@@ -6,6 +6,7 @@ import { registerCleanup } from './router'
 import type { CatalogEntry } from '../types'
 
 export function renderHome(root: HTMLElement) {
+  document.title = '天一天文馆 · 3D 天文科普'
   clear(root)
 
   const hero = el('header', 'hero')

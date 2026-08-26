@@ -12,6 +12,7 @@ export function renderDetail(root: HTMLElement, id: string) {
     return
   }
   clear(root)
+  document.title = entry.name + ' · 天一天文馆'
 
   const topbar = el('nav', 'topbar')
   topbar.innerHTML = `
