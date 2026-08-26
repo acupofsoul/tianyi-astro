@@ -1,14 +1,33 @@
 import { el } from './dom'
 import { mountSearch } from './search'
 
+const navLinks: [string, string][] = [
+  ['首页', '#/'],
+  ['目录', '#/browse'],
+  ['太阳系', '#/?cat=太阳系'],
+  ['行星', '#/?cat=行星'],
+  ['卫星', '#/?cat=卫星'],
+  ['矮行星', '#/?cat=矮行星'],
+  ['深空天体', '#/?cat=深空天体'],
+  ['天文现象', '#/?cat=天文现象']
+]
+
 export function renderSiteHeader(opts?: { query?: string; onInput?: (q: string) => void }): HTMLElement {
   const header = el('header', 'site-header')
   header.innerHTML = `
     <a href="#/" class="brand">知天易</a>
+    <nav class="main-nav">
+      ${navLinks.map(([label, href]) => '<a href="' + href + '" class="nav-link">' + label + '</a>').join('')}
+    </nav>
     <div class="searchbox" id="header-search"></div>
-    <span class="header-sub">3D 天文科学馆</span>
   `
   const box = header.querySelector<HTMLElement>('#header-search')!
   mountSearch(box, opts)
+
+  const current = location.hash || '#/'
+  header.querySelectorAll<HTMLAnchorElement>('.main-nav a').forEach((a) => {
+    if (a.getAttribute('href') === current) a.classList.add('active')
+  })
+
   return header
 }

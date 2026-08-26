@@ -1,10 +1,9 @@
 import { Viewer } from '../viewer'
 import { buildSceneFor } from '../scenes'
-import { getEntry, searchCatalog } from '../catalog'
+import { getEntry, searchCatalog, catalog } from '../catalog'
 import { el, clear } from './dom'
 import { registerCleanup } from './router'
 import { renderSiteHeader } from './header'
-import type { CatalogEntry } from '../types'
 
 const sceneNotes: Record<string, string> = {
   solarSystem: '轨道半径采用对数压缩；公转相对速度基于真实周期（开普勒第三定律），体积与距离非真实比例。',
@@ -21,6 +20,16 @@ const sceneNotes: Record<string, string> = {
   supernova: '示意核坍缩抛射物，中心遗留中子星遗迹。'
 }
 
+function seqNav(prevId: string | null, prevName: string, nextId: string | null, nextName: string): string {
+  const prev = prevId
+    ? '<a class="seq-link" href="#/p/' + prevId + '">← ' + prevName + '</a>'
+    : '<span class="seq-link disabled">已是第一个</span>'
+  const next = nextId
+    ? '<a class="seq-link" href="#/p/' + nextId + '">' + nextName + ' →</a>'
+    : '<span class="seq-link disabled">已是最后一个</span>'
+  return '<div class="seq-nav">' + prev + '<a class="seq-link center" href="#/browse">目录</a>' + next + '</div>'
+}
+
 export function renderDetail(root: HTMLElement, id: string) {
   const entry = getEntry(id)
   if (!entry) {
@@ -30,6 +39,9 @@ export function renderDetail(root: HTMLElement, id: string) {
   clear(root)
   document.title = entry.name + ' · 知天易'
   const item = entry
+  const idx = catalog.findIndex((x) => x.id === item.id)
+  const prev = idx > 0 ? catalog[idx - 1] : null
+  const next = idx < catalog.length - 1 ? catalog[idx + 1] : null
 
   root.appendChild(renderSiteHeader())
 
@@ -40,31 +52,33 @@ export function renderDetail(root: HTMLElement, id: string) {
   viewerCol.innerHTML = `
     <div class="viewer-wrap">
       <div id="viewer-canvas"></div>
-      <div class="viewer-hint">🖱️ 拖拽旋转 · 滚轮缩放</div>
-      <div class="title-badge">${entry.category}</div>
+      <div class="viewer-hint">拖拽旋转 · 滚轮缩放</div>
+      <div class="title-badge">${item.category}</div>
       <div class="viewer-controls">
         <button id="auto-btn" class="ctrl-btn">⏸ 自动旋转</button>
         <button id="reset-btn" class="ctrl-btn">⟳ 重置视角</button>
       </div>
     </div>
-    <div class="scale-note">📐 ${sceneNotes[entry.scene] ?? '三维场景为示意，真实数值请见数据档案。'}</div>
+    <div class="scale-note">${sceneNotes[item.scene] ?? '三维场景为示意，真实数值请见数据。'}</div>
   `
   layout.appendChild(viewerCol)
 
   const content = el('article', 'content-col')
   content.innerHTML = `
+    ${seqNav(prev ? prev.id : null, prev ? prev.name : '', next ? next.id : null, next ? next.name : '')}
     <div class="detail-head">
-      <h1>${entry.emoji} ${entry.name}</h1>
-      <p class="en">${entry.enName}</p>
-      <p class="summary">${entry.summary}</p>
+      <h1>${item.emoji} ${item.name}</h1>
+      <p class="en">${item.enName}</p>
+      <p class="summary">${item.summary}</p>
     </div>
     <nav class="tabs">
-      <button class="tab active" data-tab="intro">📖 简介</button>
-      <button class="tab" data-tab="science">🔬 科学原理</button>
-      <button class="tab" data-tab="facts">📊 数据档案</button>
+      <button class="tab active" data-tab="intro">介绍</button>
+      <button class="tab" data-tab="science">原理</button>
+      <button class="tab" data-tab="facts">数据</button>
     </nav>
     <div id="tab-panel" class="tab-panel"></div>
     <div id="related-block" class="related-block"></div>
+    ${seqNav(prev ? prev.id : null, prev ? prev.name : '', next ? next.id : null, next ? next.name : '')}
   `
   layout.appendChild(content)
   root.appendChild(layout)
@@ -101,10 +115,10 @@ export function renderDetail(root: HTMLElement, id: string) {
     })
   })
 
-  const related = searchCatalog('', entry.category).filter((x) => x.id !== entry.id).slice(0, 3)
+  const related = searchCatalog('', item.category).filter((x) => x.id !== item.id).slice(0, 3)
   const relatedBlock = content.querySelector<HTMLElement>('#related-block')!
   if (related.length > 0) {
-    const h = el('h2', 'related-title', '🔗 相关天体')
+    const h = el('h2', 'related-title', '相关条目')
     relatedBlock.appendChild(h)
     const rGrid = el('div', 'related')
     for (const r of related) {
@@ -123,16 +137,16 @@ export function renderDetail(root: HTMLElement, id: string) {
 
   const canvas = viewerCol.querySelector<HTMLElement>('#viewer-canvas')!
   const viewer = new Viewer(canvas)
-  viewer.load(buildSceneFor(entry))
+  viewer.load(buildSceneFor(item))
   viewer.start()
   registerCleanup(() => viewer.dispose())
 
   const autoBtn = viewerCol.querySelector<HTMLButtonElement>('#auto-btn')!
   autoBtn.textContent = viewer.isAutoRotate() ? '⏸ 自动旋转' : '▶ 自动旋转'
   autoBtn.addEventListener('click', () => {
-    const next = !viewer.isAutoRotate()
-    viewer.setAutoRotate(next)
-    autoBtn.textContent = next ? '⏸ 自动旋转' : '▶ 自动旋转'
+    const nextOn = !viewer.isAutoRotate()
+    viewer.setAutoRotate(nextOn)
+    autoBtn.textContent = nextOn ? '⏸ 自动旋转' : '▶ 自动旋转'
   })
   viewerCol.querySelector<HTMLButtonElement>('#reset-btn')!.addEventListener('click', () => viewer.resetView())
 

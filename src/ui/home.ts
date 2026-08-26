@@ -6,16 +6,11 @@ import { registerCleanup } from './router'
 import { renderSiteHeader } from './header'
 import type { CatalogEntry } from '../types'
 
-function parseQuery(): string {
-  const m = location.hash.match(/[?&]q=([^&]+)/)
-  return m ? decodeURIComponent(m[1]) : ''
-}
-
-export function renderHome(root: HTMLElement) {
+export function renderHome(root: HTMLElement, initial: { q: string; cat: string } = { q: '', cat: '' }) {
   document.title = '知天易 · 3D 天文科学馆'
   clear(root)
 
-  const state = { q: parseQuery(), cat: '全部' }
+  const state = { q: initial.q, cat: initial.cat || '全部' }
 
   const header = renderSiteHeader({
     query: state.q,
@@ -31,10 +26,11 @@ export function renderHome(root: HTMLElement) {
     <div id="hero-canvas" class="hero-canvas"></div>
     <div class="hero-content">
       <h1>知天易</h1>
-      <p class="tagline">以科学为尺度，触摸真实的宇宙</p>
+      <p class="tagline">太阳系、行星、黑洞、彗星……能转、能缩放、能检索的 3D 天文科普</p>
       <div class="hero-actions">
-        <a href="#/p/solar-system" class="btn-primary">🌌 探索太阳系</a>
-        <button class="btn-ghost" id="random-btn">🎲 随机漫游</button>
+        <a href="#/browse" class="btn-primary">从目录开始</a>
+        <a href="#/p/solar-system" class="btn-ghost">先看太阳系</a>
+        <button class="btn-ghost" id="random-btn">随机看一个</button>
       </div>
     </div>
   `
@@ -49,8 +45,13 @@ export function renderHome(root: HTMLElement) {
   gridWrap.appendChild(grid)
   root.appendChild(gridWrap)
 
-  const footer = el('footer', undefined, '知天易 · 3D 天文科学馆 · 三维场景与贴图均为程序化生成')
+  const footer = el('footer', undefined, '知天易 · 仰望星空，看懂宇宙')
   root.appendChild(footer)
+
+  hero.querySelector<HTMLButtonElement>('#random-btn')!.addEventListener('click', () => {
+    const item = catalog[Math.floor(Math.random() * catalog.length)]
+    location.hash = '#/p/' + item.id
+  })
 
   const heroCanvas = hero.querySelector<HTMLElement>('#hero-canvas')!
   const viewer = new Viewer(heroCanvas, false)
@@ -58,24 +59,21 @@ export function renderHome(root: HTMLElement) {
   viewer.start()
   registerCleanup(() => viewer.dispose())
 
-  hero.querySelector<HTMLButtonElement>('#random-btn')!.addEventListener('click', () => {
-    const item = catalog[Math.floor(Math.random() * catalog.length)]
-    location.hash = '#/p/' + item.id
-  })
-
   function makeCard(item: CatalogEntry): HTMLAnchorElement {
+    const order = catalog.findIndex((x) => x.id === item.id)
     const a = el('a', 'card')
     a.href = '#/p/' + item.id
     a.style.setProperty('--accent', item.accent)
     a.innerHTML = `
       <div class="card-top">
+        <span class="card-num">${String(order + 1).padStart(2, '0')}</span>
         <span class="card-emoji">${item.emoji}</span>
         <span class="badge">${item.category}</span>
       </div>
       <h3>${item.name}</h3>
       <p class="en">${item.enName}</p>
       <p class="summary">${item.summary}</p>
-      <span class="hint">进入 3D 场景 →</span>
+      <span class="hint">查看 →</span>
     `
     return a
   }
@@ -84,7 +82,7 @@ export function renderHome(root: HTMLElement) {
     clear(grid)
     const items = searchCatalog(state.q, state.cat)
     if (items.length === 0) {
-      grid.appendChild(el('div', 'empty', '未找到相关天体，换个关键词试试吧 🌠'))
+      grid.appendChild(el('div', 'empty', '未找到相关天体，换个关键词试试吧'))
       return
     }
     for (const item of items) grid.appendChild(makeCard(item))
