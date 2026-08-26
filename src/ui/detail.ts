@@ -4,6 +4,7 @@ import { getEntry, searchCatalog, catalog } from '../catalog'
 import { el, clear } from './dom'
 import { registerCleanup } from './router'
 import { renderSiteHeader } from './header'
+import { entryHistory } from '../history'
 
 const sceneNotes: Record<string, string> = {
   solarSystem: '轨道半径采用对数压缩；公转相对速度基于真实周期（开普勒第三定律），体积与距离非真实比例。',
@@ -75,6 +76,7 @@ export function renderDetail(root: HTMLElement, id: string) {
       <button class="tab active" data-tab="intro">介绍</button>
       <button class="tab" data-tab="science">原理</button>
       <button class="tab" data-tab="facts">数据</button>
+      <button class="tab" data-tab="history">历史</button>
     </nav>
     <div id="tab-panel" class="tab-panel"></div>
     <div id="related-block" class="related-block"></div>
@@ -84,7 +86,7 @@ export function renderDetail(root: HTMLElement, id: string) {
   root.appendChild(layout)
 
   const panel = content.querySelector<HTMLElement>('#tab-panel')!
-  function renderTab(tab: 'intro' | 'science' | 'facts') {
+  function renderTab(tab: 'intro' | 'science' | 'facts' | 'history') {
     clear(panel)
     if (tab === 'intro') {
       const p = el('p', 'tab-text')
@@ -94,7 +96,7 @@ export function renderDetail(root: HTMLElement, id: string) {
       const p = el('p', 'tab-text')
       p.textContent = item.science
       panel.appendChild(p)
-    } else {
+    } else if (tab === 'facts') {
       const table = el('table')
       for (const f of item.facts) {
         const tr = el('tr')
@@ -103,6 +105,25 @@ export function renderDetail(root: HTMLElement, id: string) {
         table.appendChild(tr)
       }
       panel.appendChild(table)
+    } else {
+      const events = entryHistory[item.id] ?? []
+      if (events.length === 0) {
+        panel.appendChild(el('p', 'tab-text', '暂无历史条目。'))
+      } else {
+        const tl = el('div', 'local-timeline')
+        for (const ev of events) {
+          const node = el('div', 't-event')
+          node.innerHTML = `
+            <div class="t-year">${ev.year}</div>
+            <div class="t-body">
+              <h3>${ev.title}</h3>
+              <p>${ev.text}</p>
+            </div>
+          `
+          tl.appendChild(node)
+        }
+        panel.appendChild(tl)
+      }
     }
   }
 
@@ -111,7 +132,7 @@ export function renderDetail(root: HTMLElement, id: string) {
     btn.addEventListener('click', () => {
       tabs.forEach((b) => b.classList.remove('active'))
       btn.classList.add('active')
-      renderTab(btn.dataset.tab as 'intro' | 'science' | 'facts')
+      renderTab(btn.dataset.tab as 'intro' | 'science' | 'facts' | 'history')
     })
   })
 

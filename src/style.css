@@ -351,3 +351,70 @@ td:last-child { color: #dbe2f5; }
   .browse-item a { flex-wrap: wrap; }
   .b-summary { flex: 1 1 100%; order: 5; }
 }
+
+/* ---------------------------------------------------------- 博物馆大厅 ---- */
+.section-head { max-width: 1280px; margin: 0 auto; padding: 0 4vw; }
+.section-head h2 { font-family: var(--serif); font-size: 22px; color: #f2ede2; letter-spacing: 2px; }
+.section-head p { color: var(--dim); font-size: 13px; margin-top: 6px; }
+.halls { padding: 30px 4vw 8px; max-width: 1280px; margin: 0 auto; }
+.hall-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 18px; }
+.hall-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: linear-gradient(160deg, rgba(20, 26, 44, 0.85), rgba(9, 12, 22, 0.94));
+  transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+.hall-card:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--accent) 45%, transparent); box-shadow: var(--shadow); }
+.hall-num { font-family: var(--serif); color: var(--accent); font-size: 13px; letter-spacing: 1px; }
+.hall-title { font-size: 17px; letter-spacing: 1px; }
+.hall-desc { color: var(--dim); font-size: 12px; line-height: 1.5; }
+
+/* ------------------------------------------------------------ 时间轴 ------ */
+.timeline-wrap { max-width: 860px; margin: 0 auto; padding: 40px 4vw 70px; }
+.timeline-head h1 { font-family: var(--serif); font-size: 40px; letter-spacing: 4px; color: #f2ede2; }
+.timeline-head p { margin-top: 10px; color: var(--dim); font-size: 14px; }
+.era { margin-top: 42px; }
+.era-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-bottom: 4px; }
+.era-name { font-family: var(--serif); font-size: 20px; color: #f2ede2; letter-spacing: 1px; }
+.era-span { color: var(--dim); font-size: 12px; }
+.era-events {
+  position: relative;
+  margin-left: 8px;
+  padding-left: 22px;
+  padding-top: 16px;
+  border-left: 1px solid color-mix(in srgb, var(--era-color) 55%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.t-event { position: relative; }
+.t-event::before {
+  content: "";
+  position: absolute;
+  left: -27px;
+  top: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--era-color, var(--accent));
+}
+.t-year { font-family: var(--serif); color: var(--era-color, var(--accent)); font-size: 13px; letter-spacing: 0.5px; }
+.t-body h3 { font-size: 15px; margin: 4px 0 5px; color: var(--text); letter-spacing: 0.5px; }
+.t-body p { color: #a8afc9; font-size: 13px; line-height: 1.75; }
+
+.local-timeline {
+  position: relative;
+  margin-left: 8px;
+  padding-left: 22px;
+  padding-top: 4px;
+  border-left: 1px solid rgba(216, 178, 106, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.local-timeline .t-event::before { background: var(--accent); }
+.local-timeline .t-year { color: var(--accent); }

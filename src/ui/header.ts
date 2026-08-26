@@ -4,6 +4,7 @@ import { mountSearch } from './search'
 const navLinks: [string, string][] = [
   ['首页', '#/'],
   ['目录', '#/browse'],
+  ['天文史', '#/timeline'],
   ['太阳系', '#/?cat=太阳系'],
   ['行星', '#/?cat=行星'],
   ['卫星', '#/?cat=卫星'],

@@ -36,6 +36,25 @@ export function renderHome(root: HTMLElement, initial: { q: string; cat: string 
   `
   root.appendChild(hero)
 
+  const halls = el('section', 'halls')
+  halls.innerHTML = `
+    <div class="section-head">
+      <h2>展馆导览</h2>
+      <p>按主题进入展厅，或前往完整目录</p>
+    </div>
+    <div class="hall-grid">
+      <a class="hall-card" href="#/?cat=太阳系"><span class="hall-num">01</span><span class="hall-title">太阳系厅</span><span class="hall-desc">行星轨道与真实公转</span></a>
+      <a class="hall-card" href="#/?cat=行星"><span class="hall-num">02</span><span class="hall-title">行星厅</span><span class="hall-desc">八大行星与矮行星</span></a>
+      <a class="hall-card" href="#/?cat=卫星"><span class="hall-num">03</span><span class="hall-title">卫星厅</span><span class="hall-desc">月球与潮汐锁定</span></a>
+      <a class="hall-card" href="#/?cat=矮行星"><span class="hall-num">04</span><span class="hall-title">矮行星厅</span><span class="hall-desc">柯伊伯带与冥王星</span></a>
+      <a class="hall-card" href="#/?cat=深空天体"><span class="hall-num">05</span><span class="hall-title">深空厅</span><span class="hall-desc">黑洞、星云与星系</span></a>
+      <a class="hall-card" href="#/?cat=天文现象"><span class="hall-num">06</span><span class="hall-title">奇观现象厅</span><span class="hall-desc">彗星、日食、极光、超新星</span></a>
+      <a class="hall-card" href="#/timeline"><span class="hall-num">07</span><span class="hall-title">天文史时间轴</span><span class="hall-desc">人类认识宇宙的历程</span></a>
+      <a class="hall-card" href="#/browse"><span class="hall-num">08</span><span class="hall-title">展品总目录</span><span class="hall-desc">按顺序浏览全部 20 个展项</span></a>
+    </div>
+  `
+  root.appendChild(halls)
+
   const chips = el('div', 'chips')
   root.appendChild(chips)
 
