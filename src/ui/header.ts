@@ -3,14 +3,9 @@ import { mountSearch } from './search'
 
 const navLinks: [string, string][] = [
   ['首页', '#/'],
+  ['正片', '#/p/solar-system'],
   ['目录', '#/browse'],
-  ['天文史', '#/timeline'],
-  ['太阳系', '#/browse?cat=太阳系'],
-  ['行星', '#/browse?cat=行星'],
-  ['卫星', '#/browse?cat=卫星'],
-  ['矮行星', '#/browse?cat=矮行星'],
-  ['深空天体', '#/browse?cat=深空天体'],
-  ['天文现象', '#/browse?cat=天文现象']
+  ['天文史', '#/timeline']
 ]
 
 export function renderSiteHeader(opts?: { query?: string; onInput?: (q: string) => void }): HTMLElement {
@@ -27,7 +22,9 @@ export function renderSiteHeader(opts?: { query?: string; onInput?: (q: string) 
 
   const current = location.hash || '#/'
   header.querySelectorAll<HTMLAnchorElement>('.main-nav a').forEach((a) => {
-    if (a.getAttribute('href') === current) a.classList.add('active')
+    const href = a.getAttribute('href') ?? ''
+    if (href === current) a.classList.add('active')
+    else if (href === '#/p/solar-system' && current.startsWith('#/p/')) a.classList.add('active')
   })
 
   return header

@@ -9,6 +9,9 @@ export class Viewer {
   private controls: OrbitControls | null
   private clock = new THREE.Clock()
   private handle: SceneHandle | null = null
+  private endPos = new THREE.Vector3()
+  private targetVec = new THREE.Vector3()
+  private intro: { start: THREE.Vector3; end: THREE.Vector3; t: number; duration: number } | null = null
   private raf = 0
   private container: HTMLElement
   private ro: ResizeObserver
@@ -56,8 +59,14 @@ export class Viewer {
     this.scene.add(handle.group)
     const pos = handle.camera?.position ?? [0, 1, 5]
     const target = handle.camera?.target ?? [0, 0, 0]
-    this.camera.position.set(pos[0], pos[1], pos[2])
-    this.camera.lookAt(target[0], target[1], target[2])
+    this.endPos.set(pos[0], pos[1], pos[2])
+    this.targetVec.set(target[0], target[1], target[2])
+    this.camera.position.copy(this.endPos)
+    this.camera.lookAt(this.targetVec)
+    this.intro = null
+    if (this.controls) {
+      this.controls.enabled = true
+    }
     if (this.controls) {
       this.controls.target.set(target[0], target[1], target[2])
       this.controls.autoRotate = !!handle.autoRotate
@@ -66,6 +75,17 @@ export class Viewer {
       if (handle.maxDistance) this.controls.maxDistance = handle.maxDistance
       this.controls.update()
     }
+  }
+
+  playIntro(duration = 2.8) {
+    if (!this.handle) return
+    const dir = this.endPos.clone().sub(this.targetVec)
+    const start = this.targetVec.clone().add(dir.multiplyScalar(1.7))
+    start.y += 1.2
+    this.camera.position.copy(start)
+    this.camera.lookAt(this.targetVec)
+    this.intro = { start, end: this.endPos.clone(), t: 0, duration }
+    if (this.controls) this.controls.enabled = false
   }
 
   setAutoRotate(on: boolean) {
@@ -97,6 +117,21 @@ export class Viewer {
       const dt = Math.min(this.clock.getDelta(), 0.1)
       const t = this.clock.elapsedTime
       this.handle?.update?.(t, dt)
+      if (this.intro) {
+        this.intro.t += dt
+        const k = Math.min(1, this.intro.t / this.intro.duration)
+        const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2
+        this.camera.position.lerpVectors(this.intro.start, this.intro.end, e)
+        this.camera.lookAt(this.targetVec)
+        if (k >= 1) {
+          this.camera.position.copy(this.intro.end)
+          this.intro = null
+          if (this.controls) {
+            this.controls.enabled = true
+            this.controls.update()
+          }
+        }
+      }
       this.controls?.update()
       this.renderer.render(this.scene, this.camera)
       this.raf = requestAnimationFrame(loop)

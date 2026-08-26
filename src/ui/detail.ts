@@ -1,6 +1,6 @@
 import { Viewer } from '../viewer'
 import { buildSceneFor } from '../scenes'
-import { getEntry, searchCatalog, catalog } from '../catalog'
+import { getEntry, catalog } from '../catalog'
 import { el, clear } from './dom'
 import { registerCleanup } from './router'
 import { renderSiteHeader } from './header'
@@ -21,16 +21,6 @@ const sceneNotes: Record<string, string> = {
   supernova: '示意核坍缩抛射物，中心遗留中子星遗迹。'
 }
 
-function seqNav(prevId: string | null, prevName: string, nextId: string | null, nextName: string): string {
-  const prev = prevId
-    ? '<a class="seq-link" href="#/p/' + prevId + '">← ' + prevName + '</a>'
-    : '<span class="seq-link disabled">已是第一个</span>'
-  const next = nextId
-    ? '<a class="seq-link" href="#/p/' + nextId + '">' + nextName + ' →</a>'
-    : '<span class="seq-link disabled">已是最后一个</span>'
-  return '<div class="seq-nav">' + prev + '<a class="seq-link center" href="#/browse">目录</a>' + next + '</div>'
-}
-
 export function renderDetail(root: HTMLElement, id: string) {
   const entry = getEntry(id)
   if (!entry) {
@@ -46,56 +36,75 @@ export function renderDetail(root: HTMLElement, id: string) {
 
   root.appendChild(renderSiteHeader())
 
-  const layout = el('main', 'detail-layout')
-  layout.style.setProperty('--accent', entry.accent)
+  const film = el('main', 'film film-enter')
+  const prevArrow = prev ? '<a class="progress-arrow" href="#/p/' + prev.id + '">←</a>' : '<span class="progress-arrow disabled">←</span>'
+  const nextArrow = next ? '<a class="progress-arrow" href="#/p/' + next.id + '">→</a>' : '<span class="progress-arrow disabled">→</span>'
+  const segments = catalog.map((c, i) => {
+    const cls = 'p-seg' + (c.id === item.id ? ' active' : '')
+    return '<a class="' + cls + '" href="#/p/' + c.id + '" title="' + c.name + '"></a>'
+  }).join('')
 
-  const viewerCol = el('aside', 'viewer-col')
-  viewerCol.innerHTML = `
-    <div class="viewer-wrap">
-      <div id="viewer-canvas"></div>
-      <div class="viewer-hint">拖拽旋转 · 滚轮缩放</div>
-      <div class="title-badge">${item.category}</div>
-      <div class="viewer-controls">
-        <button id="auto-btn" class="ctrl-btn">⏸ 自动旋转</button>
-        <button id="reset-btn" class="ctrl-btn">⟳ 重置视角</button>
-      </div>
+  film.innerHTML = `
+    <div id="film-canvas" class="film-canvas"></div>
+    <div class="film-vignette"></div>
+
+    <div class="chapter-card">
+      <span class="chapter-no">第 ${String(idx + 1).padStart(2, '0')} 幕</span>
+      <h2>${item.name}</h2>
+      <span class="chapter-en">${item.enName}</span>
     </div>
-    <div class="scale-note">${sceneNotes[item.scene] ?? '三维场景为示意，真实数值请见数据。'}</div>
-  `
-  layout.appendChild(viewerCol)
 
-  const content = el('article', 'content-col')
-  content.innerHTML = `
-    ${seqNav(prev ? prev.id : null, prev ? prev.name : '', next ? next.id : null, next ? next.name : '')}
-    <div class="detail-head">
-      <h1>${item.emoji} ${item.name}</h1>
-      <p class="en">${item.enName}</p>
-      <p class="summary">${item.summary}</p>
+    <div class="film-controls">
+      <button id="toggle-panel" class="ctrl-btn">详情</button>
+      <button id="auto-btn" class="ctrl-btn">⏸ 自动旋转</button>
+      <button id="reset-btn" class="ctrl-btn">⟳ 重置视角</button>
     </div>
-    <nav class="tabs">
-      <button class="tab active" data-tab="intro">介绍</button>
-      <button class="tab" data-tab="science">原理</button>
-      <button class="tab" data-tab="facts">数据</button>
-      <button class="tab" data-tab="history">历史</button>
-    </nav>
-    <div id="tab-panel" class="tab-panel"></div>
-    <div id="related-block" class="related-block"></div>
-    ${seqNav(prev ? prev.id : null, prev ? prev.name : '', next ? next.id : null, next ? next.name : '')}
-  `
-  layout.appendChild(content)
-  root.appendChild(layout)
 
-  const panel = content.querySelector<HTMLElement>('#tab-panel')!
+    <div class="film-subtitle">${item.summary}</div>
+
+    <aside class="film-panel" id="film-panel">
+      <nav class="tabs">
+        <button class="tab active" data-tab="intro">介绍</button>
+        <button class="tab" data-tab="science">原理</button>
+        <button class="tab" data-tab="facts">数据</button>
+        <button class="tab" data-tab="history">历史</button>
+      </nav>
+      <div class="panel-scroll"><div id="tab-panel"></div></div>
+      <div class="scale-note">${sceneNotes[item.scene] ?? '三维场景为示意，真实数值请见数据。'}</div>
+    </aside>
+
+    <div class="film-progress">
+      ${prevArrow}
+      <div class="progress-track">${segments}</div>
+      <span class="progress-count">${String(idx + 1).padStart(2, '0')} / ${catalog.length}</span>
+      ${nextArrow}
+    </div>
+  `
+  root.appendChild(film)
+
+  const canvas = film.querySelector<HTMLElement>('#film-canvas')!
+  const viewer = new Viewer(canvas)
+  viewer.load(buildSceneFor(item))
+  viewer.start()
+  viewer.playIntro(3.2)
+  registerCleanup(() => viewer.dispose())
+
+  const panel = film.querySelector<HTMLElement>('#film-panel')!
+  const toggle = film.querySelector<HTMLButtonElement>('#toggle-panel')!
+  if (window.innerWidth < 900) panel.classList.add('collapsed')
+  toggle.addEventListener('click', () => panel.classList.toggle('collapsed'))
+
+  const panelBody = film.querySelector<HTMLElement>('#tab-panel')!
   function renderTab(tab: 'intro' | 'science' | 'facts' | 'history') {
-    clear(panel)
+    clear(panelBody)
     if (tab === 'intro') {
       const p = el('p', 'tab-text')
       p.textContent = item.intro
-      panel.appendChild(p)
+      panelBody.appendChild(p)
     } else if (tab === 'science') {
       const p = el('p', 'tab-text')
       p.textContent = item.science
-      panel.appendChild(p)
+      panelBody.appendChild(p)
     } else if (tab === 'facts') {
       const table = el('table')
       for (const f of item.facts) {
@@ -104,11 +113,11 @@ export function renderDetail(root: HTMLElement, id: string) {
         tr.appendChild(el('td', undefined, f.value))
         table.appendChild(tr)
       }
-      panel.appendChild(table)
+      panelBody.appendChild(table)
     } else {
       const events = entryHistory[item.id] ?? []
       if (events.length === 0) {
-        panel.appendChild(el('p', 'tab-text', '暂无历史条目。'))
+        panelBody.appendChild(el('p', 'tab-text', '暂无历史条目。'))
       } else {
         const tl = el('div', 'local-timeline')
         for (const ev of events) {
@@ -122,12 +131,12 @@ export function renderDetail(root: HTMLElement, id: string) {
           `
           tl.appendChild(node)
         }
-        panel.appendChild(tl)
+        panelBody.appendChild(tl)
       }
     }
   }
 
-  const tabs = content.querySelectorAll<HTMLButtonElement>('.tab')
+  const tabs = film.querySelectorAll<HTMLButtonElement>('.tab')
   tabs.forEach((btn) => {
     btn.addEventListener('click', () => {
       tabs.forEach((b) => b.classList.remove('active'))
@@ -136,40 +145,14 @@ export function renderDetail(root: HTMLElement, id: string) {
     })
   })
 
-  const related = searchCatalog('', item.category).filter((x) => x.id !== item.id).slice(0, 3)
-  const relatedBlock = content.querySelector<HTMLElement>('#related-block')!
-  if (related.length > 0) {
-    const h = el('h2', 'related-title', '相关条目')
-    relatedBlock.appendChild(h)
-    const rGrid = el('div', 'related')
-    for (const r of related) {
-      const a = el('a', 'mini')
-      a.href = '#/p/' + r.id
-      a.style.setProperty('--accent', r.accent)
-      a.innerHTML = `
-        <div class="r-emoji">${r.emoji}</div>
-        <div class="r-name">${r.name}</div>
-        <div class="r-en">${r.enName}</div>
-      `
-      rGrid.appendChild(a)
-    }
-    relatedBlock.appendChild(rGrid)
-  }
-
-  const canvas = viewerCol.querySelector<HTMLElement>('#viewer-canvas')!
-  const viewer = new Viewer(canvas)
-  viewer.load(buildSceneFor(item))
-  viewer.start()
-  registerCleanup(() => viewer.dispose())
-
-  const autoBtn = viewerCol.querySelector<HTMLButtonElement>('#auto-btn')!
+  const autoBtn = film.querySelector<HTMLButtonElement>('#auto-btn')!
   autoBtn.textContent = viewer.isAutoRotate() ? '⏸ 自动旋转' : '▶ 自动旋转'
   autoBtn.addEventListener('click', () => {
     const nextOn = !viewer.isAutoRotate()
     viewer.setAutoRotate(nextOn)
     autoBtn.textContent = nextOn ? '⏸ 自动旋转' : '▶ 自动旋转'
   })
-  viewerCol.querySelector<HTMLButtonElement>('#reset-btn')!.addEventListener('click', () => viewer.resetView())
+  film.querySelector<HTMLButtonElement>('#reset-btn')!.addEventListener('click', () => viewer.resetView())
 
   renderTab('intro')
 }
