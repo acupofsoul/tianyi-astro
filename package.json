@@ -1,0 +1,20 @@
+{
+  "name": "tianyi-astro",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "3D 天文科普网站：太阳系、行星、黑洞、彗星等天文现象的交互式 3D 可视化与科学解读",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}
