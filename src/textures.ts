@@ -456,6 +456,25 @@ function smoothstep(e0: number, e1: number, x: number) {
 }
 
 // ---------------------------------------------------------------- sprites --
+export function particleTexture(): THREE.Texture {
+  const key = 'particle'
+  const hit = cache.get(key)
+  if (hit) return hit
+  const size = 64
+  const { canvas, ctx } = makeCanvas(size, size)
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+  grad.addColorStop(0, 'rgba(255,255,255,1)')
+  grad.addColorStop(0.25, 'rgba(255,255,255,0.9)')
+  grad.addColorStop(0.5, 'rgba(255,255,255,0.35)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = grad
+  ctx.fillRect(0, 0, size, size)
+  const t = new THREE.CanvasTexture(canvas)
+  t.colorSpace = THREE.SRGBColorSpace
+  cache.set(key, t)
+  return t
+}
+
 export function glowTexture(color: string): THREE.Texture {
   const key = 'glow|' + color
   const hit = cache.get(key)

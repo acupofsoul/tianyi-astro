@@ -11,7 +11,8 @@ import {
   cloudTexture,
   ringTexture,
   glowTexture,
-  circleTexture
+  circleTexture,
+  particleTexture
 } from './textures'
 import type { CatalogEntry } from './types'
 
@@ -50,9 +51,11 @@ export interface PlanetParams {
 
 // ------------------------------------------------------------------ shared
 
-export function makeStarfield(count = 1200): THREE.Points {
+export function makeStarfield(count = 1400): THREE.Points {
   const positions = new Float32Array(count * 3)
   const colors = new Float32Array(count * 3)
+  const sizes = new Float32Array(count)
+  const phases = new Float32Array(count)
   const pal: [number, number, number][] = [
     [255, 255, 255],
     [190, 215, 255],
@@ -69,19 +72,48 @@ export function makeStarfield(count = 1200): THREE.Points {
     colors[i * 3] = (c[0] / 255) * b
     colors[i * 3 + 1] = (c[1] / 255) * b
     colors[i * 3 + 2] = (c[2] / 255) * b
+    sizes[i] = 0.6 + Math.random() * 1.7
+    phases[i] = Math.random()
   }
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
-  const mat = new THREE.PointsMaterial({
-    size: 1.4,
-    vertexColors: true,
-    sizeAttenuation: true,
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1))
+  geo.setAttribute('phase', new THREE.BufferAttribute(phases, 1))
+
+  const mat = new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uMap: { value: particleTexture() }
+    },
+    vertexShader: `
+      attribute float size;
+      attribute float phase;
+      uniform float uTime;
+      varying vec3 vColor;
+      varying float vTwinkle;
+      void main() {
+        vColor = color;
+        vTwinkle = 0.5 + 0.5 * sin(uTime * (0.6 + phase * 2.2) + phase * 6.2831);
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_PointSize = size * (180.0 / -mv.z);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uMap;
+      varying vec3 vColor;
+      varying float vTwinkle;
+      void main() {
+        vec4 tex = texture2D(uMap, gl_PointCoord);
+        gl_FragColor = vec4(vColor, tex.a * (0.55 + 0.45 * vTwinkle));
+      }
+    `,
     transparent: true,
-    opacity: 0.9,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
   })
+  ;(mat as unknown as { userData: Record<string, unknown> }).userData.twinkle = true
   return new THREE.Points(geo, mat)
 }
 
@@ -308,10 +340,11 @@ export function buildSunScene(): SceneHandle {
   const corona = new THREE.Points(
     new THREE.SphereGeometry(1.62, 48, 24),
     new THREE.PointsMaterial({
-      size: 0.09,
+      size: 0.2,
+      map: particleTexture(),
       color: 0xffa040,
       transparent: true,
-      opacity: 0.45,
+      opacity: 0.5,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -501,10 +534,11 @@ export function buildCometScene(): SceneHandle {
   const dust = new THREE.Points(
     dustGeo,
     new THREE.PointsMaterial({
-      size: 0.13,
+      size: 0.18,
+      map: particleTexture(),
       vertexColors: true,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.88,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -531,10 +565,11 @@ export function buildCometScene(): SceneHandle {
   const ion = new THREE.Points(
     ionGeo,
     new THREE.PointsMaterial({
-      size: 0.09,
+      size: 0.13,
+      map: particleTexture(),
       vertexColors: true,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.72,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -592,10 +627,11 @@ export function buildNebulaScene(): SceneHandle {
   const points = new THREE.Points(
     geo,
     new THREE.PointsMaterial({
-      size: 0.34,
+      size: 0.42,
+      map: particleTexture(),
       vertexColors: true,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.92,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -669,10 +705,11 @@ export function buildGalaxyScene(): SceneHandle {
   const points = new THREE.Points(
     geo,
     new THREE.PointsMaterial({
-      size: 0.16,
+      size: 0.2,
+      map: particleTexture(),
       vertexColors: true,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.92,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -961,9 +998,10 @@ export function buildSupernovaScene(): SceneHandle {
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
     const mat = new THREE.PointsMaterial({
       size,
+      map: particleTexture(),
       color,
       transparent: true,
-      opacity: 0.9,
+      opacity: 0.88,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })

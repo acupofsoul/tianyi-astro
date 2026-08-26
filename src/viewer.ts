@@ -117,6 +117,12 @@ export class Viewer {
       const dt = Math.min(this.clock.getDelta(), 0.1)
       const t = this.clock.elapsedTime
       this.handle?.update?.(t, dt)
+      this.scene.traverse((obj) => {
+        const mat = (obj as THREE.Mesh).material as THREE.ShaderMaterial | undefined
+        if (mat && mat.uniforms && (mat as unknown as { userData?: { twinkle?: boolean } }).userData?.twinkle) {
+          mat.uniforms.uTime.value = t
+        }
+      })
       if (this.intro) {
         this.intro.t += dt
         const k = Math.min(1, this.intro.t / this.intro.duration)
