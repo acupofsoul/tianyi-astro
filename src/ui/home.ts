@@ -19,14 +19,16 @@ export function renderHome(root: HTMLElement) {
   home.innerHTML = `
     <div id="spacetime-bg" class="spacetime-bg"></div>
     <div class="home-scroll">
-      <div class="home-hero">
-        <h1 class="home-title">知天易</h1>
-        <p class="home-desc">天文知识库 · 20 个主题 · 可 3D 查看</p>
-        <div class="home-search" id="home-search"></div>
-      </div>
-      <div class="featured-grid" id="featured-grid"></div>
-      <div class="home-more">
-        <a href="#/browse" class="more-link">查看全部 20 个主题 →</a>
+      <div class="home-inner">
+        <div class="home-hero">
+          <h1 class="home-title">知天易</h1>
+          <p class="home-desc">天文知识库 · 20 个主题</p>
+          <div class="home-search" id="home-search"></div>
+        </div>
+        <div class="featured-grid" id="featured-grid"></div>
+        <div class="home-more">
+          <a href="#/browse" class="more-link">查看全部 20 个主题 →</a>
+        </div>
       </div>
     </div>
   `
