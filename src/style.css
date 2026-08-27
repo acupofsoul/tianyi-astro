@@ -575,3 +575,94 @@ footer { flex: none; text-align: center; color: #4a5170; font-size: 12px; paddin
 .k-summary { margin-top: 4px; color: #aeb9d2; font-size: 12px; line-height: 1.5; }
 .k-cat { color: var(--dim); font-size: 11px; flex: none; }
 .knowledge-empty { grid-column: 1 / -1; text-align: center; color: var(--dim); padding: 50px 0; font-size: 14px; }
+
+/* ============================================================
+   Huashu Design · Cosmic Retro-Futurism override
+   ============================================================ */
+:root {
+  --bg0: #0a0d14;
+  --bg1: #10141e;
+  --bg2: #151b28;
+  --panel: rgba(20, 25, 37, 0.82);
+  --border: rgba(242, 236, 217, 0.14);
+  --text: #f2ecd9;
+  --dim: #9b9a8f;
+  --accent: #7a9fd0;
+  --accent-ink: #0a0d14;
+  --radius: 4px;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  --serif: "Cormorant Garamond", "EB Garamond", "Songti SC", "STSong", "Noto Serif SC", serif;
+}
+
+body {
+  background:
+    radial-gradient(1100px 650px at 78% -8%, rgba(74, 96, 128, 0.16), transparent 60%),
+    radial-gradient(900px 560px at -8% 24%, rgba(70, 88, 112, 0.12), transparent 55%),
+    linear-gradient(160deg, var(--bg0), var(--bg1) 46%, var(--bg2));
+}
+
+.site-header { background: rgba(10, 13, 20, 0.82); border-bottom: 1px solid var(--border); }
+.brand { font-family: var(--serif); letter-spacing: 4px; color: var(--text); }
+.nav-link { border-radius: 2px; color: var(--dim); }
+.nav-link:hover { color: var(--text); background: transparent; }
+.nav-link.active { color: var(--accent); background: transparent; border-bottom: 1px solid var(--accent); }
+.menu-btn { border-radius: 2px; color: var(--text); }
+
+#global-search,
+.home-search #home-search {
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: rgba(242, 236, 217, 0.03);
+  color: var(--text);
+}
+#global-search:focus,
+.home-search #home-search:focus { border-color: var(--accent); box-shadow: none; }
+
+.btn-primary, .btn-ghost { border-radius: 2px; letter-spacing: 1px; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn-primary:hover { background: #8fb1de; transform: none; }
+.btn-ghost { border: 1px solid var(--border); color: var(--text); background: transparent; }
+.btn-ghost:hover { border-color: var(--accent); transform: none; }
+
+.chip { border-radius: 2px; background: transparent; color: var(--dim); border: 1px solid transparent; }
+.chip:hover { color: var(--text); border-color: var(--border); }
+.chip.active { background: transparent; color: var(--accent); border: 0; border-bottom: 1px solid var(--accent); }
+
+.home-title,
+.browse-head h1,
+.timeline-head h1,
+.detail-head h1,
+.chapter-card h2,
+.browse-head h1,
+.drawer-brand { font-family: var(--serif); color: var(--text); letter-spacing: 2px; }
+.home-title { font-size: clamp(48px, 8vw, 88px); font-weight: 500; text-shadow: none; }
+.home-desc { letter-spacing: 3px; color: var(--dim); }
+
+.k-card {
+  border-radius: 2px;
+  border: 1px solid var(--border);
+  background: rgba(242, 236, 217, 0.02);
+  backdrop-filter: none;
+}
+.k-card:hover { transform: none; border-color: var(--accent); background: rgba(122, 159, 208, 0.06); }
+.k-num { color: var(--accent); font-family: var(--serif); }
+.k-main h3 { font-weight: 500; color: var(--text); }
+.k-summary { color: var(--dim); }
+.k-cat { color: var(--dim); }
+
+.film-panel { border-radius: 2px; border: 1px solid var(--border); background: rgba(13, 17, 26, 0.9); }
+.tabs { border-radius: 2px; border: 1px solid var(--border); }
+.tab { border-radius: 2px; }
+.tab.active { background: var(--accent); color: var(--accent-ink); }
+.ctrl-btn { border-radius: 2px; }
+.seq-link { border-radius: 2px; }
+.scale-note { border-radius: 2px; }
+.film-progress { background: linear-gradient(180deg, transparent, rgba(5, 7, 11, 0.85)); }
+.p-seg { border-radius: 0; }
+.progress-arrow { border-radius: 2px; }
+
+.browse-item a { border-radius: 2px; background: rgba(242, 236, 217, 0.02); }
+.browse-item a:hover { border-color: var(--accent); background: rgba(122, 159, 208, 0.06); transform: none; }
+.drawer { border-radius: 0; background: rgba(10, 13, 20, 0.97); }
+.drawer-link, .drawer-sub-link { border-radius: 2px; }
+.drawer-sub-link:hover { background: rgba(122, 159, 208, 0.08); }
