@@ -724,3 +724,13 @@ body {
 .k-en { display: block; margin: 3px 0 0; font-size: 11px; letter-spacing: 1px; color: var(--dim); }
 .k-summary { margin-top: 8px; font-size: 14px; line-height: 1.7; color: #c9c4b5; }
 .k-emoji { font-size: 32px; }
+
+/* 首页精选 3 项 + 查看更多 */
+.featured-grid { max-width: 920px; margin: 30px auto 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.home-more { text-align: center; margin-top: 26px; }
+.more-link { color: var(--accent); font-size: 14px; letter-spacing: 1px; border-bottom: 1px solid transparent; padding-bottom: 3px; }
+.more-link:hover { border-bottom-color: var(--accent); }
+
+@media (max-width: 720px) {
+  .featured-grid { grid-template-columns: 1fr; }
+}

@@ -1,10 +1,12 @@
 import { SpacetimeCanvas } from '../fx/spacetime'
-import { categories, searchCatalog, catalog } from '../catalog'
+import { catalog } from '../catalog'
 import { el, clear } from './dom'
 import { registerCleanup } from './router'
 import { renderSiteHeader } from './header'
 import { mountSearch } from './search'
 import type { CatalogEntry } from '../types'
+
+const featuredIds = ['solar-system', 'blackhole', 'galaxy']
 
 export function renderHome(root: HTMLElement) {
   document.title = '知天易 · 天文知识库'
@@ -12,8 +14,6 @@ export function renderHome(root: HTMLElement) {
 
   // 首页只有一个搜索（顶部搜索在首页隐藏）
   root.appendChild(renderSiteHeader({ hideSearch: true }))
-
-  const state = { q: '', cat: '全部' }
 
   const home = el('main', 'home')
   home.innerHTML = `
@@ -24,8 +24,10 @@ export function renderHome(root: HTMLElement) {
         <p class="home-desc">天文知识库 · 20 个主题 · 可 3D 查看</p>
         <div class="home-search" id="home-search"></div>
       </div>
-      <div class="chips" id="home-chips"></div>
-      <div class="knowledge-grid" id="knowledge-grid"></div>
+      <div class="featured-grid" id="featured-grid"></div>
+      <div class="home-more">
+        <a href="#/browse" class="more-link">查看全部 20 个主题 →</a>
+      </div>
     </div>
   `
   root.appendChild(home)
@@ -35,63 +37,33 @@ export function renderHome(root: HTMLElement) {
   fx.start()
   registerCleanup(() => fx.dispose())
 
-  const grid = home.querySelector<HTMLElement>('#knowledge-grid')!
-  const chips = home.querySelector<HTMLElement>('#home-chips')!
+  mountSearch(home.querySelector<HTMLElement>('#home-search')!, { inputId: 'home-search' })
 
-  mountSearch(home.querySelector<HTMLElement>('#home-search')!, {
-    inputId: 'home-search',
-    onInput: (q) => {
-      state.q = q
-      renderGrid()
-    }
-  })
+  const grid = home.querySelector<HTMLElement>('#featured-grid')!
+  for (const id of featuredIds) {
+    const item = catalog.find((x) => x.id === id)
+    if (item) grid.appendChild(makeCard(item))
+  }
+}
 
-  function makeCard(item: CatalogEntry): HTMLAnchorElement {
-    const order = catalog.findIndex((x) => x.id === item.id)
-    const a = el('a', 'k-card')
-    a.href = '#/p/' + item.id
-    a.style.setProperty('--accent', item.accent)
-    a.innerHTML = `
-      <div class="k-head">
-        <span class="k-num">${String(order + 1).padStart(2, '0')}</span>
-        <span class="k-cat">${item.category}</span>
+function makeCard(item: CatalogEntry): HTMLAnchorElement {
+  const order = catalog.findIndex((x) => x.id === item.id)
+  const a = el('a', 'k-card')
+  a.href = '#/p/' + item.id
+  a.style.setProperty('--accent', item.accent)
+  a.innerHTML = `
+    <div class="k-head">
+      <span class="k-num">${String(order + 1).padStart(2, '0')}</span>
+      <span class="k-cat">${item.category}</span>
+    </div>
+    <div class="k-body">
+      <span class="k-emoji">${item.emoji}</span>
+      <div class="k-main">
+        <h3>${item.name}</h3>
+        <p class="k-en">${item.enName}</p>
+        <p class="k-summary">${item.summary}</p>
       </div>
-      <div class="k-body">
-        <span class="k-emoji">${item.emoji}</span>
-        <div class="k-main">
-          <h3>${item.name}</h3>
-          <p class="k-en">${item.enName}</p>
-          <p class="k-summary">${item.summary}</p>
-        </div>
-      </div>
-    `
-    return a
-  }
-
-  function renderGrid() {
-    clear(grid)
-    const items = searchCatalog(state.q, state.cat)
-    if (items.length === 0) {
-      grid.appendChild(el('div', 'knowledge-empty', '未找到相关主题，换个关键词试试'))
-      return
-    }
-    for (const item of items) grid.appendChild(makeCard(item))
-  }
-
-  function renderChips() {
-    clear(chips)
-    const all = ['全部', ...categories]
-    for (const c of all) {
-      const chip = el('button', 'chip' + (c === state.cat ? ' active' : ''), c)
-      chip.addEventListener('click', () => {
-        state.cat = c
-        renderChips()
-        renderGrid()
-      })
-      chips.appendChild(chip)
-    }
-  }
-
-  renderChips()
-  renderGrid()
+    </div>
+  `
+  return a
 }
