@@ -666,3 +666,61 @@ body {
 .drawer { border-radius: 0; background: rgba(10, 13, 20, 0.97); }
 .drawer-link, .drawer-sub-link { border-radius: 2px; }
 .drawer-sub-link:hover { background: rgba(122, 159, 208, 0.08); }
+
+/* ============================================================
+   Homepage cleanup: clarity + readability
+   ============================================================ */
+.home { position: relative; }
+.home::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 72px;
+  background: linear-gradient(180deg, transparent, rgba(5, 7, 11, 0.92));
+  pointer-events: none;
+  z-index: 1;
+}
+.home-scroll { padding-bottom: 80px; }
+.home-hero { gap: 14px; padding-top: 4vh; }
+.home-title { font-size: clamp(46px, 7vw, 72px); font-weight: 500; }
+.home-desc { font-size: 13px; letter-spacing: 2px; }
+.home-search { width: min(480px, 92vw); }
+
+.chips { justify-content: center; gap: 8px; padding: 16px 0 18px; }
+.chip {
+  padding: 8px 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: rgba(242, 236, 217, 0.03);
+  color: var(--dim);
+  font-size: 12px;
+}
+.chip:hover { color: var(--text); border-color: rgba(242, 236, 217, 0.32); }
+.chip.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
+.knowledge-grid { gap: 14px; }
+.k-card {
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  background: rgba(242, 236, 217, 0.05);
+  border: 1px solid rgba(242, 236, 217, 0.16);
+}
+.k-head { display: flex; align-items: center; justify-content: space-between; }
+.k-num { font-size: 13px; letter-spacing: 1px; }
+.k-cat { font-size: 11px; letter-spacing: 1px; color: var(--dim); }
+.k-body { display: flex; gap: 14px; align-items: flex-start; }
+.k-emoji { font-size: 30px; line-height: 1; }
+.k-main { flex: 1; min-width: 0; }
+.k-main h3 { font-size: 17px; color: var(--text); display: flex; align-items: baseline; }
+.k-en { margin-left: 8px; font-size: 11px; color: var(--dim); }
+.k-summary { margin-top: 5px; font-size: 13px; line-height: 1.6; color: #b8b3a5; }
+.knowledge-empty { color: var(--dim); }
+
+/* 卡片可读性精修 */
+.k-main h3 { display: block; }
+.k-en { display: block; margin: 3px 0 0; font-size: 11px; letter-spacing: 1px; color: var(--dim); }
+.k-summary { margin-top: 8px; font-size: 14px; line-height: 1.7; color: #c9c4b5; }
+.k-emoji { font-size: 32px; }

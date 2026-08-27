@@ -52,13 +52,18 @@ export function renderHome(root: HTMLElement) {
     a.href = '#/p/' + item.id
     a.style.setProperty('--accent', item.accent)
     a.innerHTML = `
-      <span class="k-num">${String(order + 1).padStart(2, '0')}</span>
-      <span class="k-emoji">${item.emoji}</span>
-      <div class="k-main">
-        <h3>${item.name}<span class="k-en">${item.enName}</span></h3>
-        <p class="k-summary">${item.summary}</p>
+      <div class="k-head">
+        <span class="k-num">${String(order + 1).padStart(2, '0')}</span>
+        <span class="k-cat">${item.category}</span>
       </div>
-      <span class="k-cat">${item.category}</span>
+      <div class="k-body">
+        <span class="k-emoji">${item.emoji}</span>
+        <div class="k-main">
+          <h3>${item.name}</h3>
+          <p class="k-en">${item.enName}</p>
+          <p class="k-summary">${item.summary}</p>
+        </div>
+      </div>
     `
     return a
   }
