@@ -391,48 +391,29 @@ export function buildBlackholeScene(): SceneHandle {
   const group = new THREE.Group()
   group.add(makeStarfield(1800))
 
-  // 事件视界（史瓦西半径 Rs = 1 个长度单位）
-  const horizon = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 48, 48),
-    new THREE.MeshBasicMaterial({ color: 0x000000 })
-  )
-  group.add(horizon)
-
-  // 黑洞阴影：非自转黑洞的阴影半径约为 2.6 Rs（由光线弯曲造成）
-  const shadow = new THREE.Mesh(
-    new THREE.SphereGeometry(2.6, 64, 64),
-    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.98 })
-  )
-  group.add(shadow)
-
-  // 光子环：临界光线环绕黑洞形成的亮环，位于阴影边缘
-  const photonRing = new THREE.Mesh(
-    new THREE.RingGeometry(2.56, 2.7, 180),
-    new THREE.MeshBasicMaterial({
-      color: 0xfff2d8,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.9,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    })
-  )
-  photonRing.rotation.x = Math.PI / 2 - 0.38
-  group.add(photonRing)
-
-  // 吸积盘：内缘取最内稳定圆轨道 ISCO ≈ 3 Rs（史瓦西黑洞）
-  const diskMat = new THREE.ShaderMaterial({
+  // 引力透镜光路：在始终朝向相机的平面上做带光线弯曲的步进。
+  // 用史瓦西弯曲近似重现「星际穿越」式吸积盘：正面盘横贯身前，
+  // 背面盘被引力弯到阴影上下方，形成一圈亮环（光子环贴住阴影边缘）。
+  const lensMat = new THREE.ShaderMaterial({
     vertexShader: `
-      varying vec3 vPos;
+      varying vec3 vWorldPos;
       void main() {
-        vPos = position;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPos = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
       }
     `,
     fragmentShader: `
+      precision highp float;
+      varying vec3 vWorldPos;
       uniform float uTime;
-      varying vec3 vPos;
-      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+
+      #define RS 1.0
+      #define R_IN 3.0
+      #define R_OUT 12.0
+      #define MAX_STEPS 240
+
+      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
       float noise(vec2 p) {
         vec2 i = floor(p);
         vec2 f = fract(p);
@@ -443,52 +424,95 @@ export function buildBlackholeScene(): SceneHandle {
           f.y
         );
       }
-      void main() {
-        vec2 p = vPos.xy;
-        float r = length(p);
-        float a = atan(p.y, p.x);
-        float inR = 3.0;
-        float outR = 11.0;
-        float radial = clamp((r - inR) / (outR - inR), 0.0, 1.0);
-        vec3 inner = vec3(1.0, 0.96, 0.86);
+
+      vec3 diskColor(float r, vec2 xz, float dop) {
+        float rad = clamp((r - R_IN) / (R_OUT - R_IN), 0.0, 1.0);
+        vec3 inner = vec3(1.0, 0.94, 0.86);
         vec3 mid = vec3(1.0, 0.55, 0.15);
-        vec3 outer = vec3(0.42, 0.07, 0.02);
-        vec3 col = mix(inner, mid, smoothstep(0.0, 0.3, radial));
-        col = mix(col, outer, smoothstep(0.3, 1.0, radial));
-        float n = noise(vec2(r * 6.0, a * 5.0) + vec2(uTime * 0.3, uTime * 0.18));
-        col *= 0.72 + 0.55 * n;
-        // 多普勒束流：朝向我们运动的一侧更亮
-        float beam = 1.0 + 0.55 * sin(a - uTime * 1.4);
-        col *= beam;
-        float alpha = smoothstep(0.0, 0.06, radial) * (1.0 - smoothstep(0.8, 1.0, radial));
-        gl_FragColor = vec4(col, alpha * 0.92);
+        vec3 outer = vec3(0.38, 0.06, 0.02);
+        vec3 col = mix(inner, mid, smoothstep(0.0, 0.34, rad));
+        col = mix(col, outer, smoothstep(0.34, 1.0, rad));
+        float ang = atan(xz.y, xz.x);
+        float n = noise(vec2(r * 4.5, ang * 6.0) + vec2(uTime * 0.22, uTime * 0.14));
+        col *= 0.68 + 0.64 * n;
+        col *= dop;
+        return col;
+      }
+
+      void main() {
+        vec3 ro = cameraPosition;
+        vec3 rd = normalize(vWorldPos - ro);
+        vec3 p = ro;
+        vec3 dir = rd;
+        float minDist = 1e9;
+        vec3 col = vec3(0.0);
+        float alpha = 0.0;
+
+        for (int i = 0; i < MAX_STEPS; i++) {
+          float d = length(p);
+          if (d < RS) {
+            gl_FragColor = vec4(vec3(0.0), 1.0);
+            return;
+          }
+          if (d > 70.0) break;
+          minDist = min(minDist, d);
+
+          vec3 prev = p;
+          float step = clamp(0.035 * d, 0.012, 0.4);
+          vec3 rhat = p / d;
+          vec3 acc = -0.5 * rhat / (d * d);
+          dir = normalize(dir + acc * step * 1.6);
+          p += dir * step;
+
+          // 穿过吸积盘平面（y=0）时取样
+          if (prev.y * p.y < 0.0) {
+            float f = prev.y / (prev.y - p.y);
+            vec3 cross = mix(prev, p, f);
+            float r = length(cross.xz);
+            if (r > R_IN && r < R_OUT) {
+              vec3 tang = normalize(vec3(-cross.z, 0.0, cross.x));
+              float dop = clamp(1.0 + 1.1 * dot(tang, -dir), 0.15, 2.1);
+              col = diskColor(r, cross.xz, dop);
+              alpha = 1.0;
+              break;
+            }
+          }
+        }
+
+        // 光子环：贴着阴影边缘的一圈细亮环
+        float ring = exp(-pow((minDist - 2.62) / 0.07, 2.0));
+        col += vec3(1.0, 0.9, 0.75) * ring * 1.5;
+        alpha = max(alpha, ring * 0.95);
+
+        // 阴影外的微弱暖色晕
+        float glow = exp(-pow(minDist / 7.0, 3.0)) * 0.06;
+        col += vec3(1.0, 0.62, 0.3) * glow;
+        alpha = max(alpha, glow);
+
+        if (alpha <= 0.001) discard;
+        gl_FragColor = vec4(col, alpha);
       }
     `,
     uniforms: { uTime: { value: 0 } },
     transparent: true,
-    side: THREE.DoubleSide,
     depthWrite: false,
-    blending: THREE.AdditiveBlending
+    side: THREE.DoubleSide
   })
-  const disk = new THREE.Mesh(new THREE.RingGeometry(3.0, 11.0, 160, 1), diskMat)
-  const diskPivot = new THREE.Group()
-  diskPivot.rotation.x = Math.PI / 2 - 0.38
-  diskPivot.add(disk)
-  group.add(diskPivot)
 
-  const halo = makeGlowSprite('#ffaa55', 12, 0.14)
-  group.add(halo)
+  const lens = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), lensMat)
+  lens.onBeforeRender = (_renderer: THREE.WebGLRenderer, _scene: THREE.Scene, camera: THREE.Camera) => {
+    lens.lookAt(camera.position)
+  }
+  group.add(lens)
 
   return {
     group,
-    update: (t, dt) => {
-      diskMat.uniforms.uTime.value = t
-      disk.rotation.z += dt * 0.5
-      halo.scale.setScalar(12 * (1 + 0.03 * Math.sin(t * 2)))
+    update: (t) => {
+      lensMat.uniforms.uTime.value = t
     },
-    camera: { position: [0, 6.5, 19] },
+    camera: { position: [0, 4.6, 19], target: [0, 0, 0] },
     minDistance: 4,
-    maxDistance: 50
+    maxDistance: 60
   }
 }
 
