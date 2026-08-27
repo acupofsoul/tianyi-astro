@@ -2,8 +2,8 @@ import { categories, catalog } from '../catalog'
 import { el } from './dom'
 import { mountSearch } from './search'
 
-export function renderSiteHeader(opts?: { query?: string; onInput?: (q: string) => void }): HTMLElement {
-  const header = el('header', 'site-header')
+export function renderSiteHeader(opts?: { query?: string; onInput?: (q: string) => void; hideSearch?: boolean }): HTMLElement {
+  const header = el('header', 'site-header' + (opts?.hideSearch ? ' no-search' : ''))
   header.innerHTML = `
     <button class="menu-btn" id="menu-btn" aria-label="打开菜单">☰</button>
     <a href="#/" class="brand">知天易</a>
