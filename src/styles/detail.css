@@ -1,0 +1,514 @@
+/* ============================================================
+   详情页信息架构
+   所有者：工作流 C（详情页）
+   只在本文件中写属于该工作流的样式；不要修改其他 CSS 文件。
+   可用 token 见 src/styles/tokens.css（--hud-*、--mono、--ease-out …）
+   ============================================================ */
+
+.dt-film {
+  /* 右侧 HUD 侧栏宽度；≤900px 时面板变成底部抽屉，不再使用该变量 */
+  --dt-panel-w: min(392px, 34vw);
+  --dt-edge: 20px;
+}
+
+/* ---------------------------------------------------- 首帧淡入 / 加载态 */
+.dt-film .film-canvas {
+  opacity: 0;
+  transition: opacity 0.6s var(--ease-out);
+}
+.dt-film.dt-ready .film-canvas { opacity: 1; }
+.dt-film.dt-no-webgl .film-canvas { display: none; }
+
+.dt-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 45%, rgba(8, 14, 24, 0.7), rgba(4, 8, 14, 0.95));
+  transition: opacity 0.4s var(--ease-out);
+}
+.dt-loading-out { opacity: 0; pointer-events: none; }
+.dt-loading-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 24px;
+  text-align: center;
+}
+.dt-loading-ring {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 1px solid var(--hud-line);
+  border-top-color: var(--hud-cyan);
+  box-shadow: var(--hud-glow);
+  animation: dtSpin 1.1s linear infinite;
+}
+@keyframes dtSpin { to { transform: rotate(360deg); } }
+.dt-loading-title {
+  font-family: var(--serif, serif);
+  font-size: 20px;
+  letter-spacing: 4px;
+  color: var(--hud-text);
+}
+.dt-loading-sub { letter-spacing: 0.22em; }
+.dt-loading-bar {
+  width: min(240px, 62vw);
+  height: 2px;
+  background: var(--hud-line);
+  overflow: hidden;
+}
+.dt-loading-bar-fill {
+  display: block;
+  width: 38%;
+  height: 100%;
+  background: var(--hud-cyan);
+  box-shadow: var(--hud-glow);
+  animation: dtScan 1.5s var(--ease-out) infinite;
+}
+@keyframes dtScan {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(280%); }
+}
+.dt-loading-name { color: var(--hud-dim); font-size: 12px; letter-spacing: 0.1em; max-width: 30ch; }
+.dt-loading-fail .dt-loading-title { color: var(--hud-amber); }
+.dt-loading-fail .dt-loading-name { font-family: var(--mono); font-size: 11px; line-height: 1.7; }
+
+/* ---------------------------------------------------- 左栏（叙事 + 控制） */
+.dt-left-col {
+  position: absolute;
+  top: var(--dt-edge);
+  left: var(--dt-edge);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: min(520px, calc(100% - var(--dt-panel-w) - 60px));
+  pointer-events: none;
+}
+.dt-left-col > * { pointer-events: auto; }
+.dt-left-col .chapter-card { position: static; }
+
+/* 章卡标题是详情页唯一的 h1（style.css 的 .chapter-card h2 规则不再命中，这里等价接续） */
+.dt-chapter h1 {
+  margin-top: 2px;
+  font-family: var(--serif);
+  font-size: clamp(26px, 4vw, 40px);
+  letter-spacing: 2px;
+  color: var(--text);
+}
+
+.dt-chapter-meta {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--hud-line);
+  color: var(--hud-dim);
+}
+
+/* ------------------------------------------------------------ 3D 控制栏 */
+.dt-dock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  max-width: 100%;
+  background: var(--hud-bg);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+.dt-dock-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dt-dock-status { min-height: 11px; color: var(--hud-dim); letter-spacing: 0.12em; }
+.dt-dock-status:empty { display: none; }
+
+.dt-btn {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  background: var(--hud-inset);
+  color: var(--hud-text);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  transition: border-color 0.16s var(--ease-out), color 0.16s var(--ease-out), box-shadow 0.16s var(--ease-out);
+}
+.dt-btn:hover:not(:disabled) {
+  border-color: var(--hud-line-strong);
+  color: #fff;
+  box-shadow: var(--hud-glow);
+}
+.dt-btn[aria-pressed='true'] {
+  border-color: var(--hud-cyan);
+  color: var(--hud-cyan);
+}
+.dt-btn:disabled { opacity: 0.42; cursor: not-allowed; }
+.dt-btn-icon { min-width: 80px; }
+.dt-preset-group { display: flex; gap: 4px; }
+.dt-btn-preset { min-width: 48px; padding: 0 6px; }
+
+/* 可视化辅助层开关 */
+.dt-dock-sub { flex: none; letter-spacing: 0.16em; }
+.dt-overlay-row { align-items: center; }
+.dt-btn-overlay {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 86px;
+  justify-content: center;
+}
+.dt-overlay-dot { font-size: 10px; line-height: 1; color: var(--hud-dim); }
+.dt-btn-overlay[aria-pressed='true'] .dt-overlay-dot {
+  color: var(--hud-cyan);
+  text-shadow: var(--hud-glow);
+}
+.dt-btn-overlay[aria-pressed='false'] .dt-overlay-dot { opacity: 0.6; }
+.dt-btn-overlay:disabled .dt-overlay-dot { opacity: 0.35; }
+.dt-btn-overlay:disabled .dt-overlay-text { opacity: 0.75; }
+
+.dt-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 190px;
+  min-width: 0;
+  min-height: 34px;
+  cursor: pointer;
+}
+.dt-slider-label { white-space: nowrap; }
+.dt-range {
+  flex: 1 1 auto;
+  min-width: 90px;
+  height: 22px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+}
+.dt-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--hud-line-strong), var(--hud-cyan));
+}
+.dt-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5.5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hud-cyan);
+  box-shadow: var(--hud-glow);
+}
+.dt-range::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--hud-line-strong), var(--hud-cyan));
+}
+.dt-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--hud-cyan);
+  box-shadow: var(--hud-glow);
+}
+.dt-speed { min-width: 52px; font-size: 12px; text-align: right; }
+
+/* ------------------------------------------------------------ 拾取信息卡 */
+.dt-pick {
+  max-width: 260px;
+  padding: 10px 12px;
+  background: var(--hud-bg);
+  animation: dtPickIn 0.22s var(--ease-out) both;
+}
+@keyframes dtPickIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.dt-pick-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dt-pick-name { margin-top: 4px; font-size: 15px; letter-spacing: 0.06em; color: var(--hud-text); }
+.dt-pick-coord-label { margin-top: 6px; }
+.dt-pick-coord { margin-top: 2px; font-size: 11px; letter-spacing: 0.08em; }
+.dt-pick-close {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  background: transparent;
+  color: var(--hud-dim);
+  font-size: 15px;
+  line-height: 1;
+}
+.dt-pick-close:hover { border-color: var(--hud-line-strong); color: #fff; }
+
+/* ---------------------------------------------------- 右侧 HUD 侧栏 */
+.dt-side {
+  width: var(--dt-panel-w);
+  top: 82px;
+  bottom: 74px;
+  right: var(--dt-edge);
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-line);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+.dt-grip { display: none; }
+.dt-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px 0;
+}
+.dt-side-kicker { letter-spacing: 0.2em; }
+.dt-side-close {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  background: transparent;
+  color: var(--hud-dim);
+  font-size: 16px;
+  line-height: 1;
+}
+.dt-side-close:hover { border-color: var(--hud-line-strong); color: #fff; }
+
+.dt-tabs {
+  padding: 8px 8px 0;
+  gap: 4px;
+  border-bottom: 1px solid var(--hud-line);
+}
+.dt-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 4px 8px;
+  border: 0;
+  border-radius: var(--hud-radius);
+  background: transparent;
+  color: var(--hud-dim);
+  font-size: 13px;
+}
+.dt-tab:hover { color: var(--hud-text); background: var(--hud-inset); }
+.dt-tab.active {
+  background: var(--hud-inset);
+  color: var(--hud-cyan);
+  box-shadow: inset 0 -1px 0 var(--hud-cyan);
+}
+.dt-tab-key { font-family: var(--mono); font-size: 9px; opacity: 0.55; }
+
+.dt-scroll { padding: 14px 14px 18px; }
+.dt-panel-body { min-width: 0; }
+.dt-tab-kicker { margin-bottom: 10px; letter-spacing: 0.2em; }
+.dt-lead {
+  margin-bottom: 14px;
+  color: var(--hud-dim);
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+/* 数据标签页 · 可视化块 */
+.dt-viz-block {
+  margin-bottom: 14px;
+  padding: 10px;
+  border: 1px solid var(--hud-line);
+  background: var(--hud-inset);
+}
+.dt-viz-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.dt-viz-title { font-size: 13px; letter-spacing: 0.06em; color: var(--hud-text); }
+.dt-viz-tag { letter-spacing: 0.16em; }
+.dt-viz-host { min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; }
+.dt-viz-fallback { color: var(--hud-dim); font-size: 12px; line-height: 1.7; }
+
+.dt-facts-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 0 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--hud-line);
+}
+.dt-facts-hint { color: var(--hud-dim); font-size: 10px; letter-spacing: 0.1em; }
+.dt-table th,
+.dt-table td {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--hud-line);
+  font-size: 13px;
+  vertical-align: top;
+  text-align: left;
+}
+.dt-table th { width: 42%; color: var(--hud-dim); font-weight: 400; }
+.dt-table td { color: var(--hud-text); font-variant-numeric: tabular-nums; }
+
+/* 相关天体 */
+.dt-related {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hud-line);
+}
+.dt-related-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.dt-related-title { font-size: 14px; color: var(--hud-text); letter-spacing: 0.08em; }
+.dt-related-tag { letter-spacing: 0.16em; }
+.dt-related-list { display: flex; flex-direction: column; gap: 6px; }
+.dt-rel-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  background: var(--hud-inset);
+  transition: border-color 0.16s var(--ease-out), transform 0.16s var(--ease-out);
+}
+.dt-rel-card:hover { border-color: var(--hud-cyan); transform: translateX(2px); }
+.dt-rel-emoji { font-size: 18px; line-height: 1; }
+.dt-rel-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dt-rel-name { font-size: 13px; color: var(--hud-text); }
+.dt-rel-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--hud-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dt-rel-arrow { margin-left: auto; color: var(--hud-cyan); font-size: 16px; }
+
+.dt-note {
+  border-color: var(--hud-line);
+  background: var(--hud-inset);
+  color: var(--hud-dim);
+}
+
+/* ------------------------------------------------------------ 底部进度条 */
+.dt-subtitle {
+  left: 0;
+  right: calc(var(--dt-panel-w) + 48px);
+  max-width: 68%;
+  margin: 0 auto;
+  transform: none;
+  text-align: center;
+}
+.dt-progress {
+  border-top: 1px solid var(--hud-line);
+  background: linear-gradient(180deg, transparent, rgba(5, 7, 11, 0.9));
+}
+.dt-progress .progress-arrow {
+  width: 34px;
+  height: 34px;
+  border-color: var(--hud-line);
+  border-radius: var(--hud-radius);
+  color: var(--hud-text);
+  background: var(--hud-inset);
+}
+.dt-progress .progress-arrow:hover { border-color: var(--hud-cyan); color: #fff; }
+.dt-progress .p-seg { background: var(--hud-line); }
+.dt-progress .p-seg:hover { background: var(--hud-line-strong); }
+.dt-progress .p-seg.active { background: var(--hud-cyan); box-shadow: var(--hud-glow); }
+.dt-panel-toggle { font-family: var(--mono); letter-spacing: 0.08em; }
+
+/* 焦点可见性 */
+.dt-film :focus-visible {
+  outline: 1px solid var(--hud-cyan);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   ≤900px：3D 在上 + 底部可拖拽抽屉
+   ============================================================ */
+@media (max-width: 900px) {
+  .dt-film { --dt-edge: 12px; }
+
+  .dt-left-col {
+    top: 10px;
+    left: 12px;
+    right: 12px;
+    max-width: none;
+    gap: 8px;
+  }
+  .dt-chapter h1 { font-size: clamp(19px, 5.2vw, 26px); }
+  .dt-chapter-meta { display: none; }
+  .dt-subtitle { display: none; }
+  .dt-film-controls { display: none; }
+
+  .dt-btn { min-height: 44px; padding: 0 10px; }
+  .dt-btn-icon { min-width: 88px; }
+  .dt-preset-group { gap: 6px; }
+  .dt-btn-preset { min-width: 44px; padding: 0 6px; }
+  .dt-btn-overlay { min-width: 74px; }
+  .dt-slider { min-height: 44px; }
+  .dt-speed { min-width: 46px; }
+  .dt-dock { padding: 8px 10px; gap: 6px; }
+  .dt-dock-row { gap: 6px; }
+  .dt-pick-close,
+  .dt-side-close { width: 44px; height: 44px; }
+
+  .film-panel.dt-side {
+    top: auto;
+    right: 0;
+    bottom: 58px;
+    left: 0;
+    width: auto;
+    height: min(76vh, 560px);
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 0;
+    transform: translateY(var(--dt-drawer-y, 0px));
+    transition: transform 0.32s var(--ease-out);
+    will-change: transform;
+  }
+  .film-panel.dt-side.dt-drawer-dragging { transition: none; }
+
+  .dt-grip {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 26px;
+    border: 0;
+    background: transparent;
+    cursor: grab;
+    touch-action: none;
+  }
+  .dt-grip:active { cursor: grabbing; }
+  .dt-grip-bar {
+    width: 46px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--hud-line-strong);
+    box-shadow: var(--hud-glow);
+  }
+  .dt-side-head { padding: 0 12px; }
+  .dt-tabs { padding: 6px 8px 0; }
+  .dt-tab { min-height: 44px; justify-content: center; }
+  .dt-scroll { padding: 12px 14px 20px; }
+  .dt-rel-card { min-height: 52px; }
+  .dt-progress .progress-arrow { width: 44px; height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dt-film .film-canvas,
+  .film-panel.dt-side { transition: none; }
+  .dt-loading-ring,
+  .dt-loading-bar-fill { animation: none; }
+  .dt-pick { animation: none; }
+  .dt-rel-card:hover { transform: none; }
+}
