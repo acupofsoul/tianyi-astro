@@ -59,7 +59,10 @@ setPaused(v: boolean): void; isPaused(): boolean
 presets(): ViewPreset[]; applyPreset(id: string): void
 capture(): string; onPick(cb: (info: PickInfo | null) => void): void
 setPickEnabled(v: boolean): void; getHandle(): SceneHandle | null
+setOverlay(id: 'orbits' | 'labels' | 'scale', on: boolean): void; isOverlay(id): boolean
 ```
+
+时间倍率范围：**0.1–32**（与 UI 滑块 9 档 0.1/0.25/0.5/1/2/4/8/16/32 对齐；初版契约写 20，集成阶段按 UI 放宽为 32）。
 
 ## 验收标准
 
