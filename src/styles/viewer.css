@@ -1,0 +1,100 @@
+/* ============================================================
+   3D 查看器交互层
+   所有者：工作流 B（3D 层）
+   只在本文件中写属于该工作流的样式；不要修改其他 CSS 文件。
+   可用 token 见 src/styles/tokens.css（--hud-*、--mono、--ease-out …）
+   ============================================================ */
+
+/* ---------------------------------------------------------- 叠加层根 */
+.viewer-overlays {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 4;
+}
+
+/* 画布键盘焦点：HUD 青色描边 */
+.film-canvas canvas:focus-visible {
+  outline: 2px solid var(--hud-cyan);
+  outline-offset: -2px;
+}
+
+/* ---------------------------------------------------------- 比例尺参考球 */
+.viewer-scale {
+  position: absolute;
+  right: 18px;
+  bottom: 68px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: min(46vw, 320px);
+  padding: 10px 12px 12px;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  backdrop-filter: blur(8px);
+  color: var(--hud-text);
+  box-sizing: border-box;
+}
+
+.viewer-scale[hidden] {
+  display: none;
+}
+
+.viewer-scale-ball {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--hud-line-strong);
+  background: radial-gradient(circle at 50% 50%, rgba(95, 214, 255, 0.18), rgba(95, 214, 255, 0.02) 70%);
+  box-shadow: var(--hud-glow), inset 0 0 18px rgba(95, 214, 255, 0.12);
+  position: relative;
+  flex: none;
+}
+
+.viewer-scale-ball::before,
+.viewer-scale-ball::after {
+  content: "";
+  position: absolute;
+  background: var(--hud-line-strong);
+}
+
+.viewer-scale-ball::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+}
+
+.viewer-scale-ball::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+
+.viewer-scale-text {
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: var(--hud-dim);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 720px) {
+  .viewer-scale {
+    right: 10px;
+    bottom: 150px;
+    max-width: min(58vw, 240px);
+    padding: 8px 10px 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewer-scale {
+    transition: none;
+  }
+}

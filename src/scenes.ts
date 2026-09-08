@@ -14,7 +14,20 @@ import {
   circleTexture,
   particleTexture
 } from './textures'
-import type { CatalogEntry } from './types'
+import type { CatalogEntry, SceneKind } from './types'
+import type { SceneLabelAnchor, SceneMeta, SceneOverlays, SceneScaleRef } from './scenes/types'
+import {
+  disposeObject3D,
+  makeCraterTexture,
+  makeLabelOverlay,
+  makePickProxy,
+  makeScaleOverlay,
+  makeSurfaceSpot,
+  markPick,
+  normalFromLatLon,
+  normalFromUv,
+  placeSurfaceSpot
+} from './scenes/props'
 
 export interface SceneHandle {
   group: THREE.Group
@@ -25,6 +38,20 @@ export interface SceneHandle {
   autoRotateSpeed?: number
   minDistance?: number
   maxDistance?: number
+  /** 场景类型，用于视角预设微调（工作流 B 新增可选字段）。 */
+  kind?: SceneKind
+  /** 主体半径（世界单位），用于"近观"机位与拾取阈值。 */
+  subjectRadius?: number
+  /** 场景整体半径（世界单位），用于俯视 / 侧视取景。 */
+  boundsRadius?: number
+  /** 主体中心（世界坐标），默认 [0,0,0]。 */
+  subjectCenter?: [number, number, number]
+  /** 比例尺参考球。 */
+  scaleRef?: SceneScaleRef
+  /** 天体标签锚点。 */
+  labelAnchors?: SceneLabelAnchor[]
+  /** 可开关的可视化辅助层。 */
+  overlays?: SceneOverlays
 }
 
 export interface PlanetParams {
@@ -47,9 +74,22 @@ export interface PlanetParams {
   brightColor?: string
   gasColors?: string[]
   gasSpot?: { x: number; y: number; rx: number; ry: number; color: string }
+  /** 拾取 / 标签用的中文名（由 buildSceneFor 注入）。 */
+  name?: string
+  /** 比例尺参考球说明（真实直径，含单位与近似程度）。 */
+  scaleLabel?: string
+  /** 环的拾取名，例如"土星环"。 */
+  ringName?: string
+  /** 表面斑点的拾取名，例如"大红斑"。 */
+  spotName?: string
+  /** 让斑点初始朝向相机的自转相位（弧度），用于预设截图时可见。 */
+  spotFacing?: number
 }
 
 // ------------------------------------------------------------------ shared
+// 拾取标记统一用 markPick()（内部写入 userData.pickName，见 src/scenes/props.ts）。
+// 各 build*Scene 里共 39 处标记，覆盖太阳光球/日冕、行星特征、土星环、黑洞吸积盘/光子环/事件视界、
+// 彗核/离子尾/尘埃尾、月球陨石坑、流星雨辐射点、极光分层等。
 
 export function makeStarfield(count = 1400): THREE.Points {
   const positions = new Float32Array(count * 3)
@@ -111,6 +151,7 @@ export function makeStarfield(count = 1400): THREE.Points {
     `,
     transparent: true,
     depthWrite: false,
+    vertexColors: true,
     blending: THREE.AdditiveBlending
   })
   ;(mat as unknown as { userData: Record<string, unknown> }).userData.twinkle = true
@@ -196,20 +237,61 @@ function defaultCamera(r: number): SceneHandle['camera'] {
   return { position: [r * 2.2, r * 0.9, r * 2.7], target: [0, 0, 0] }
 }
 
+/**
+ * 收尾装饰（可重复调用）：
+ * 设置场景类型与默认尺度字段、用真实条目数据覆盖比例尺说明、
+ * 按 labelAnchors / scaleRef 重建标签与参考球层，并挂上 dispose。
+ */
+export function decorateScene(handle: SceneHandle, kind?: SceneKind, meta?: SceneMeta): SceneHandle {
+  if (kind) handle.kind = kind
+  if (meta?.scaleLabel && handle.scaleRef) handle.scaleRef.label = meta.scaleLabel
+  if (meta?.labelAnchors) handle.labelAnchors = meta.labelAnchors
+  if (!handle.subjectCenter) handle.subjectCenter = [0, 0, 0]
+  if (!handle.subjectRadius) handle.subjectRadius = handle.boundsRadius ?? 1
+  if (!handle.boundsRadius) handle.boundsRadius = handle.subjectRadius * 3
+
+  const previous = handle.overlays
+  const overlays: SceneOverlays = {}
+  if (previous?.orbits) overlays.orbits = previous.orbits
+  if (previous?.labels) {
+    handle.group.remove(previous.labels)
+    disposeObject3D(previous.labels)
+  }
+  if (previous?.scale) {
+    handle.group.remove(previous.scale)
+    disposeObject3D(previous.scale)
+  }
+  if (handle.labelAnchors && handle.labelAnchors.length > 0) {
+    const labels = makeLabelOverlay(handle.labelAnchors)
+    handle.group.add(labels)
+    overlays.labels = labels
+  }
+  if (handle.scaleRef) {
+    const scale = makeScaleOverlay(handle.scaleRef)
+    handle.group.add(scale)
+    overlays.scale = scale
+  }
+  handle.overlays = overlays
+  if (!handle.dispose) handle.dispose = () => disposeObject3D(handle.group)
+  return handle
+}
+
 // ------------------------------------------------------------------- scene builders
 
 export function buildStarfieldScene(): SceneHandle {
   const group = new THREE.Group()
   group.add(makeStarfield(1400))
-  return {
+  return decorateScene({
     group,
     update: (_t, dt) => {
       group.rotation.y += dt * 0.012
       group.rotation.x += dt * 0.004
     },
     camera: { position: [0, 1.5, 6] },
-    autoRotate: false
-  }
+    autoRotate: false,
+    subjectRadius: 3,
+    boundsRadius: 10
+  })
 }
 
 export function buildPlanetScene(p: PlanetParams): SceneHandle {
@@ -243,8 +325,30 @@ export function buildPlanetScene(p: PlanetParams): SceneHandle {
   }
   const mat = new THREE.MeshStandardMaterial({ map, roughness: 1, metalness: 0 })
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 64, 64), mat)
+  markPick(mesh, p.name ?? '行星')
+  if (p.gasSpot) {
+    // 让斑点初始朝向相机，否则默认机位可能看到的是背面。
+    mesh.rotation.y = p.spotFacing ?? (seed === 55 ? 4.145 : seed === 88 ? 0.279 : 0)
+  }
   tilt.add(mesh)
 
+  if (p.gasSpot) {
+    const spot = makeSurfaceSpot({
+      radius,
+      color: p.gasSpot.color,
+      name: p.spotName ?? (p.kind === 'gas' ? '大红斑' : '大暗斑'),
+      opacity: 0.88
+    })
+    const normal = normalFromUv(p.gasSpot.x, p.gasSpot.y, new THREE.Vector3())
+    placeSurfaceSpot(
+      spot,
+      radius,
+      normal,
+      p.gasSpot.rx * Math.PI * 2 * radius,
+      p.gasSpot.ry * Math.PI * radius
+    )
+    mesh.add(spot)
+  }
   if (p.cloud) {
     const cloudMat = new THREE.MeshStandardMaterial({
       map: cloudTexture(seed + 5),
@@ -253,26 +357,40 @@ export function buildPlanetScene(p: PlanetParams): SceneHandle {
       depthWrite: false
     })
     const clouds = new THREE.Mesh(new THREE.SphereGeometry(radius * 1.015, 48, 48), cloudMat)
+    markPick(clouds, '云层')
     tilt.add(clouds)
   }
   if (p.atmosphere) {
-    tilt.add(makeAtmosphere(radius * 1.05, p.atmosphere, p.atmosphereOpacity ?? 0.55))
+    const atmosphere = makeAtmosphere(radius * 1.05, p.atmosphere, p.atmosphereOpacity ?? 0.55)
+    markPick(atmosphere, '大气层')
+    tilt.add(atmosphere)
   }
   if (p.rings) {
-    group.add(makeRings(p.rings.inner, p.rings.outer, p.rings.seed ?? seed, p.rings.colors, p.rings.tilt ?? 0, p.rings.gaps))
+    const rings = makeRings(p.rings.inner, p.rings.outer, p.rings.seed ?? seed, p.rings.colors, p.rings.tilt ?? 0, p.rings.gaps)
+    markPick(rings, p.ringName ?? '行星环')
+    group.add(rings)
   }
   group.add(makeStarfield(900))
 
   const rot = p.rotationSpeed ?? 0.12
-  return {
+  const subjectRadius = p.rings ? p.rings.outer : radius
+  return decorateScene({
     group,
     update: (_t, dt) => {
       mesh.rotation.y += dt * rot
     },
     camera: defaultCamera(radius),
     minDistance: radius * 1.5,
-    maxDistance: radius * 8
-  }
+    maxDistance: radius * 8,
+    subjectRadius,
+    boundsRadius: p.rings ? p.rings.outer * 2.4 : radius * 3.2,
+    labelAnchors: [{ name: p.name ?? '行星', position: [0, radius * 1.5, 0] }],
+    scaleRef: {
+      radius,
+      label: p.scaleLabel ?? '参考球：球径 = 场景主体半径（真实直径见数据面板，形状与比例示意）',
+      position: [subjectRadius * 1.8, -radius * 1.2, 0]
+    }
+  }, 'planet')
 }
 export function buildSunScene(): SceneHandle {
   const group = new THREE.Group()
@@ -335,6 +453,7 @@ export function buildSunScene(): SceneHandle {
     uniforms: { uTime: { value: 0 } }
   })
   const sun = new THREE.Mesh(new THREE.SphereGeometry(1.4, 64, 64), mat)
+  markPick(sun, '光球层')
   group.add(sun)
 
   const corona = new THREE.Points(
@@ -349,14 +468,25 @@ export function buildSunScene(): SceneHandle {
       depthWrite: false
     })
   )
+  markPick(corona, '日冕')
   group.add(corona)
 
   const glow1 = makeGlowSprite('#ff8c1a', 5.2, 0.5)
   const glow2 = makeGlowSprite('#ffb84d', 9, 0.2)
+  markPick(glow1, '日冕辉光')
+  markPick(glow2, '日冕辉光')
   group.add(glow1, glow2)
+
+  // 太阳黑子：位置与着色器里的 sp 同步演化，作为可拾取的实体标记。
+  const sunspot = makeSurfaceSpot({ radius: 1.4, color: '#3a1a08', name: '太阳黑子', opacity: 0.72 })
+  const sunspotNormal = new THREE.Vector3()
+  const sunspotHalfW = 0.109 * Math.PI * 2 * 1.4
+  const sunspotHalfH = 0.05 * Math.PI * 1.4
+  sun.add(sunspot)
+
   group.add(makeStarfield(900))
 
-  return {
+  return decorateScene({
     group,
     update: (t, dt) => {
       mat.uniforms.uTime.value = t
@@ -364,27 +494,81 @@ export function buildSunScene(): SceneHandle {
       corona.rotation.y += dt * 0.02
       corona.rotation.x += dt * 0.008
       glow1.scale.setScalar(5.2 * (1 + 0.04 * Math.sin(t * 1.6)))
+      const su = 0.3 + 0.2 * Math.sin(t * 0.05)
+      const sv = 0.58 + 0.08 * Math.cos(t * 0.07)
+      normalFromUv(su, sv, sunspotNormal)
+      placeSurfaceSpot(sunspot, 1.4, sunspotNormal, sunspotHalfW, sunspotHalfH)
     },
     camera: { position: [0, 1.2, 5.8] },
     minDistance: 2,
-    maxDistance: 14
-  }
+    maxDistance: 14,
+    subjectRadius: 1.4,
+    boundsRadius: 6,
+    labelAnchors: [
+      { name: '光球层', position: [0, 0, 0] },
+      { name: '日冕', position: [0, 2.1, 0] },
+      { name: '太阳黑子', position: [0.9, 0.7, 1.1] }
+    ],
+    scaleRef: {
+      radius: 1.4,
+      label: '参考球：太阳半径约 69.6 万 km（光球层，形状与比例示意）',
+      position: [3.4, -1.4, 0]
+    }
+  }, 'sun')
 }
 export function buildMoonScene(): SceneHandle {
   const group = new THREE.Group()
   const mat = new THREE.MeshStandardMaterial({ map: moonTexture(9), roughness: 1 })
   const moon = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), mat)
+  // 让月球正面（经度约 0° 的一侧）初始朝向相机，便于看到并点击主要地貌。
+  moon.rotation.y = -Math.PI / 2
+  markPick(moon, '月球')
   group.add(moon)
+
+  // 陨石坑 / 月海标记：位置参考真实经纬度，大小与形状为示意（已放大以便拾取）。
+  const craterTex = makeCraterTexture()
+  const features: { lat: number; lon: number; size: number; name: string; mare: boolean }[] = [
+    { lat: -43.3, lon: -11.4, size: 0.085, name: '第谷环形山', mare: false },
+    { lat: 9.6, lon: -20.1, size: 0.07, name: '哥白尼环形山', mare: false },
+    { lat: 8.1, lon: -38.0, size: 0.055, name: '开普勒环形山', mare: false },
+    { lat: 8.5, lon: 31.4, size: 0.16, name: '静海', mare: true },
+    { lat: 18.4, lon: -57.4, size: 0.22, name: '风暴洋', mare: true },
+    { lat: 17.0, lon: 59.1, size: 0.12, name: '危海', mare: true }
+  ]
+  const anchors: SceneLabelAnchor[] = [{ name: '月球', position: [0, 1.35, 0] }]
+  const normal = new THREE.Vector3()
+  for (const f of features) {
+    const spot = makeSurfaceSpot({
+      radius: 1,
+      color: f.mare ? '#8f949c' : '#c9ccd4',
+      name: f.name,
+      opacity: f.mare ? 0.72 : 0.85,
+      map: craterTex
+    })
+    normalFromLatLon(f.lat, f.lon, normal)
+    placeSurfaceSpot(spot, 1, normal, f.size, f.size)
+    moon.add(spot)
+    anchors.push({ name: f.name, position: [normal.x * 1.08, normal.y * 1.08, normal.z * 1.08] })
+  }
+
   group.add(makeStarfield(1000))
-  return {
+  return decorateScene({
     group,
     update: (_t, dt) => {
       moon.rotation.y += dt * 0.05
     },
     camera: { position: [0, 0.9, 3.8] },
     minDistance: 1.6,
-    maxDistance: 10
-  }
+    maxDistance: 10,
+    subjectRadius: 1,
+    boundsRadius: 4,
+    labelAnchors: anchors,
+    scaleRef: {
+      radius: 1,
+      label: '参考球：月球半径约 1,737 km（直径 3,474 km，形状与比例示意）',
+      position: [2.4, -1.1, 0]
+    }
+  }, 'moon')
 }
 
 export function buildBlackholeScene(): SceneHandle {
@@ -505,15 +689,36 @@ export function buildBlackholeScene(): SceneHandle {
   }
   group.add(lens)
 
-  return {
+  // ---- 拾取代理（visible=false 不参与绘制，但 Raycaster 仍能命中）----
+  // 事件视界：半径 1 Rs 的球体，位于阴影中心。
+  group.add(makePickProxy(new THREE.SphereGeometry(1, 24, 16), '事件视界'))
+  // 阴影盘（约 2.6 Rs）与光子环做成 lens 的子物体，随 lens 一起朝向相机，贴合屏幕上的视觉环。
+  lens.add(makePickProxy(new THREE.CircleGeometry(2.6, 64), '事件视界阴影'))
+  lens.add(makePickProxy(new THREE.TorusGeometry(2.62, 0.1, 8, 96), '光子环'))
+  // 吸积盘：世界坐标 y=0 平面上的环带，内缘 ISCO ≈ 3 Rs，外缘 12 Rs（示意）。
+  group.add(makePickProxy(new THREE.RingGeometry(3, 12, 96), '吸积盘', undefined, [-Math.PI / 2, 0, 0]))
+
+  return decorateScene({
     group,
     update: (t) => {
       lensMat.uniforms.uTime.value = t
     },
     camera: { position: [0, 4.6, 19], target: [0, 0, 0] },
     minDistance: 4,
-    maxDistance: 60
-  }
+    maxDistance: 60,
+    subjectRadius: 12,
+    boundsRadius: 26,
+    labelAnchors: [
+      { name: '事件视界', position: [0, 0, 0] },
+      { name: '光子环', position: [2.62, 0, 0] },
+      { name: '吸积盘', position: [7, 0, 0] }
+    ],
+    scaleRef: {
+      radius: 1,
+      label: '参考球：1 Rs（史瓦西半径；事件视界半径 = 2GM/c²，示意）',
+      position: [0, -2.6, 0]
+    }
+  }, 'blackhole')
 }
 
 export function buildCometScene(): SceneHandle {
@@ -531,9 +736,11 @@ export function buildCometScene(): SceneHandle {
     nucleusGeo,
     new THREE.MeshStandardMaterial({ color: 0x9a9aa2, roughness: 1 })
   )
+  markPick(nucleus, '彗核')
   group.add(nucleus)
 
   const coma = makeGlowSprite('#bff3ff', 3.2, 0.35)
+  markPick(coma, '彗发')
   group.add(coma)
 
   // 尘埃尾：宽、黄白、沿轨道向后弯曲（太阳风/辐射压作用下滞后）
@@ -567,6 +774,7 @@ export function buildCometScene(): SceneHandle {
       depthWrite: false
     })
   )
+  markPick(dust, '尘埃尾')
   group.add(dust)
 
   // 离子尾：窄、偏蓝、沿太阳风方向几乎笔直背离太阳（此处太阳在 +X 方向）
@@ -598,15 +806,17 @@ export function buildCometScene(): SceneHandle {
       depthWrite: false
     })
   )
+  markPick(ion, '离子尾')
   group.add(ion)
 
   // 太阳方向指示（示意光源方向）
   const sunLight = makeGlowSprite('#fff2c8', 2.4, 0.5)
   sunLight.position.x = 9
+  markPick(sunLight, '太阳方向（示意）')
   group.add(sunLight)
   group.add(makeStarfield(900))
 
-  return {
+  return decorateScene({
     group,
     update: (t, dt) => {
       nucleus.rotation.y += dt * 0.25
@@ -615,8 +825,22 @@ export function buildCometScene(): SceneHandle {
     },
     camera: { position: [0, 2.2, 7.5] },
     minDistance: 1.8,
-    maxDistance: 22
-  }
+    maxDistance: 22,
+    subjectRadius: 12,
+    boundsRadius: 26,
+    labelAnchors: [
+      { name: '彗核', position: [0, 0, 0] },
+      { name: '彗发', position: [0, 0.8, 0] },
+      { name: '尘埃尾', position: [-8, 1.6, 0] },
+      { name: '离子尾', position: [-9, 0, 0] },
+      { name: '太阳方向', position: [9, 0.6, 0] }
+    ],
+    scaleRef: {
+      radius: 0.5,
+      label: '参考球：彗核半径约 7.5 km（哈雷彗核约 15×8×8 km，形状不规则，示意）',
+      position: [2.8, -1.5, 0]
+    }
+  }, 'comet')
 }
 
 export function buildNebulaScene(): SceneHandle {
@@ -660,12 +884,16 @@ export function buildNebulaScene(): SceneHandle {
       depthWrite: false
     })
   )
+  markPick(points, '星云气体')
   group.add(points)
-  group.add(makeGlowSprite('#a8c8ff', 7, 0.4))
-  group.add(makeGlowSprite('#ff9dd2', 4, 0.3))
+  const nebulaCore = makeGlowSprite('#a8c8ff', 7, 0.4)
+  const nebulaHii = makeGlowSprite('#ff9dd2', 4, 0.3)
+  markPick(nebulaCore, '星云核心')
+  markPick(nebulaHii, '恒星形成区')
+  group.add(nebulaCore, nebulaHii)
   group.add(makeStarfield(900))
 
-  return {
+  return decorateScene({
     group,
     update: (_t, dt) => {
       group.rotation.y += dt * 0.018
@@ -675,8 +903,19 @@ export function buildNebulaScene(): SceneHandle {
     autoRotate: true,
     autoRotateSpeed: 0.5,
     minDistance: 3,
-    maxDistance: 30
-  }
+    maxDistance: 30,
+    subjectRadius: 5,
+    boundsRadius: 14,
+    labelAnchors: [
+      { name: '星云核心', position: [0, 0, 0] },
+      { name: '分子云', position: [3.2, 1.2, 2.0] }
+    ],
+    scaleRef: {
+      radius: 1,
+      label: '参考球：1 世界单位（猎户座星云直径约 24 光年，形态为艺术化示意）',
+      position: [0, -2.6, 0]
+    }
+  }, 'nebula')
 }
 
 export function buildGalaxyScene(): SceneHandle {
@@ -738,11 +977,14 @@ export function buildGalaxyScene(): SceneHandle {
       depthWrite: false
     })
   )
+  markPick(points, '银河系盘面')
   group.add(points)
-  group.add(makeGlowSprite('#ffe9b0', 3.2, 0.6))
+  const galacticCore = makeGlowSprite('#ffe9b0', 3.2, 0.6)
+  markPick(galacticCore, '银心')
+  group.add(galacticCore)
   group.add(makeStarfield(800))
 
-  return {
+  return decorateScene({
     group,
     update: (_t, dt) => {
       group.rotation.y += dt * 0.05
@@ -751,8 +993,20 @@ export function buildGalaxyScene(): SceneHandle {
     autoRotate: true,
     autoRotateSpeed: 0.6,
     minDistance: 3,
-    maxDistance: 30
-  }
+    maxDistance: 30,
+    subjectRadius: 5.7,
+    boundsRadius: 16,
+    labelAnchors: [
+      { name: '银心', position: [0, 0, 0] },
+      { name: '旋臂', position: [4.2, 0, 0] },
+      { name: '棒状核心', position: [1.4, 0, 0] }
+    ],
+    scaleRef: {
+      radius: 1,
+      label: '参考球：1 世界单位（盘面半径约 5.7 单位；银河系直径约 10~18 万光年，非等比示意）',
+      position: [0, -2.2, 0]
+    }
+  }, 'galaxy')
 }
 
 export function buildMeteorScene(): SceneHandle {
@@ -762,6 +1016,7 @@ export function buildMeteorScene(): SceneHandle {
   interface Meteor {
     pos: THREE.Vector3
     dir: THREE.Vector3
+    tail: THREE.Vector3
     speed: number
     age: number
     life: number
@@ -772,16 +1027,19 @@ export function buildMeteorScene(): SceneHandle {
   }
   const meteors: Meteor[] = []
   const headTex = glowTexture('#fff3c0')
-  // 辐射点：所有流星的轨迹反向延长后交汇于此
-  const radiant = new THREE.Vector3(0.55, 0.85, -0.15).normalize()
-  const radPos = radiant.clone().multiplyScalar(46)
+  // 辐射点：所有流星的轨迹反向延长后交汇于此。
+  // 方向经过调整，使默认机位（0,2.2,13）能把辐射点收进视野，便于点击。
+  const radiant = new THREE.Vector3(0.35, 0.15, -0.25).normalize()
+  const radPos = radiant.clone().multiplyScalar(30)
+  const spawnOffset = new THREE.Vector3()
+  const spawnJitter = new THREE.Vector3()
 
   function spawn(m: Meteor) {
-    m.pos.copy(radPos).add(new THREE.Vector3().randomDirection().multiplyScalar(4.5))
-    m.dir = radiant
-      .clone()
+    m.pos.copy(radPos).add(spawnOffset.randomDirection().multiplyScalar(4.5))
+    m.dir
+      .copy(radiant)
       .multiplyScalar(-1)
-      .add(new THREE.Vector3().randomDirection().multiplyScalar(0.16))
+      .add(spawnJitter.randomDirection().multiplyScalar(0.16))
       .normalize()
     m.speed = 20 + Math.random() * 14
     m.age = 0
@@ -807,13 +1065,30 @@ export function buildMeteorScene(): SceneHandle {
       depthWrite: false
     })
     const line = new THREE.Line(lineGeo, lineMat)
-    const m: Meteor = { pos: new THREE.Vector3(), dir: new THREE.Vector3(), speed: 20, age: 0, life: 2, head, line, lineMat, headMat }
+    const m: Meteor = {
+      pos: new THREE.Vector3(),
+      dir: new THREE.Vector3(),
+      tail: new THREE.Vector3(),
+      speed: 20,
+      age: 0,
+      life: 2,
+      head,
+      line,
+      lineMat,
+      headMat
+    }
     spawn(m)
     meteors.push(m)
     group.add(head, line)
   }
 
-  return {
+  // 辐射点标记：可见的小光点 + 拾取名，方便在场景里定位。
+  const radiantMarker = makeGlowSprite('#ffd166', 2.4, 0.8)
+  radiantMarker.position.copy(radPos)
+  markPick(radiantMarker, '辐射点')
+  group.add(radiantMarker)
+
+  return decorateScene({
     group,
     update: (_t, dt) => {
       for (const m of meteors) {
@@ -821,11 +1096,10 @@ export function buildMeteorScene(): SceneHandle {
         m.age += dt
         const fade = 1 - m.age / m.life
         const len = 1.3 + m.speed * 0.05
-        const p0 = m.pos
-        const p1 = m.pos.clone().addScaledVector(m.dir, -len)
+        m.tail.copy(m.pos).addScaledVector(m.dir, -len)
         const attr = m.line.geometry.attributes.position as THREE.BufferAttribute
-        attr.setXYZ(0, p0.x, p0.y, p0.z)
-        attr.setXYZ(1, p1.x, p1.y, p1.z)
+        attr.setXYZ(0, m.pos.x, m.pos.y, m.pos.z)
+        attr.setXYZ(1, m.tail.x, m.tail.y, m.tail.z)
         attr.needsUpdate = true
         m.head.position.copy(m.pos)
         m.headMat.opacity = Math.max(0, fade)
@@ -835,8 +1109,16 @@ export function buildMeteorScene(): SceneHandle {
     },
     camera: { position: [0, 2.2, 13] },
     minDistance: 4,
-    maxDistance: 30
-  }
+    maxDistance: 30,
+    subjectRadius: 6,
+    boundsRadius: 24,
+    labelAnchors: [{ name: '辐射点', position: [radPos.x, radPos.y, radPos.z] }],
+    scaleRef: {
+      radius: 1,
+      label: '参考球：1 世界单位（流星典型高度约 80~120 km，场景为示意）',
+      position: [0, -2.2, 0]
+    }
+  }, 'meteor')
 }
 
 export function buildEclipseScene(): SceneHandle {
@@ -846,22 +1128,28 @@ export function buildEclipseScene(): SceneHandle {
   const sunMat = new THREE.MeshBasicMaterial({ color: 0xffd27a })
   const sun = new THREE.Mesh(new THREE.SphereGeometry(1.1, 48, 48), sunMat)
   sun.position.x = -9
+  markPick(sun, '太阳光球')
   group.add(sun)
   const sunGlow = makeGlowSprite('#ffc46b', 6, 0.7)
   sunGlow.position.x = -9
+  markPick(sunGlow, '日冕辉光')
   group.add(sunGlow)
 
   // 日冕：全食时太阳光球被遮挡，日冕才清晰可见
   const corona = makeGlowSprite('#fff6e0', 4.4, 0.12)
   corona.position.x = -9
+  markPick(corona, '日冕')
   group.add(corona)
 
   const earth = new THREE.Mesh(
     new THREE.SphereGeometry(0.6, 48, 48),
     new THREE.MeshStandardMaterial({ map: earthTexture(5), roughness: 1 })
   )
+  markPick(earth, '地球')
   group.add(earth)
-  group.add(makeAtmosphere(0.63, '#4a9df8', 0.5))
+  const earthAtmo = makeAtmosphere(0.63, '#4a9df8', 0.5)
+  markPick(earthAtmo, '地球大气层')
+  group.add(earthAtmo)
 
   const moonPivot = new THREE.Group()
   const moon = new THREE.Mesh(
@@ -869,11 +1157,13 @@ export function buildEclipseScene(): SceneHandle {
     new THREE.MeshStandardMaterial({ map: moonTexture(3), roughness: 1 })
   )
   moon.position.x = 1.8
+  markPick(moon, '月球')
   moonPivot.add(moon)
   group.add(moonPivot)
 
   // 地球表面的本影斑
   const shadow = makeCircleSprite('#000000', 0.3, 0)
+  markPick(shadow, '月影斑')
   group.add(shadow)
 
   // 月球背后的本影锥：全食带由月影扫过地表形成
@@ -885,6 +1175,7 @@ export function buildEclipseScene(): SceneHandle {
     side: THREE.DoubleSide
   })
   const umbra = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.8, 32, 1, true), umbraMat)
+  markPick(umbra, '月球本影锥')
   group.add(umbra)
 
   const light = new THREE.DirectionalLight(0xfff2d0, 2)
@@ -892,7 +1183,10 @@ export function buildEclipseScene(): SceneHandle {
   group.add(light)
 
   let angle = 0
-  return {
+  const moonPos = new THREE.Vector3()
+  const dirToEarth = new THREE.Vector3()
+  const upAxis = new THREE.Vector3(0, 1, 0)
+  return decorateScene({
     group,
     update: (_t, dt) => {
       angle += dt * 0.42
@@ -910,16 +1204,30 @@ export function buildEclipseScene(): SceneHandle {
       shadow.position.set(0.28, 0, 0)
       shadow.material.opacity = amt * 0.9
 
-      const moonPos = new THREE.Vector3(moonX, moonY, 0)
-      const dirToEarth = moonPos.clone().negate().normalize()
+      moonPos.set(moonX, moonY, 0)
+      dirToEarth.copy(moonPos).negate().normalize()
       umbra.position.copy(moonPos).addScaledVector(dirToEarth, 0.9)
-      umbra.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirToEarth)
+      umbra.quaternion.setFromUnitVectors(upAxis, dirToEarth)
       umbraMat.opacity = amt * 0.4
     },
     camera: { position: [4.6, 3.4, 8.6] },
     minDistance: 2,
-    maxDistance: 24
-  }
+    maxDistance: 24,
+    subjectRadius: 4,
+    boundsRadius: 16,
+    labelAnchors: [
+      { name: '太阳', position: [-9, 1.7, 0] },
+      { name: '日冕', position: [-9, 0, 0] },
+      { name: '地球', position: [0, 1.1, 0] },
+      { name: '月球', position: [0, 0, 0] },
+      { name: '本影锥', position: [0, 0, 0] }
+    ],
+    scaleRef: {
+      radius: 1.1,
+      label: '参考球：太阳半径约 69.6 万 km（日食几何为示意，非等比）',
+      position: [0, -2.2, 0]
+    }
+  }, 'eclipse')
 }
 
 export function buildAuroraScene(): SceneHandle {
@@ -929,6 +1237,7 @@ export function buildAuroraScene(): SceneHandle {
     new THREE.MeshStandardMaterial({ color: 0x0c1a30, roughness: 0.6, emissive: 0x02060f })
   )
   planet.position.y = -1.9
+  markPick(planet, '行星夜面')
   group.add(planet)
 
   const auroraMat = new THREE.ShaderMaterial({
@@ -967,7 +1276,7 @@ export function buildAuroraScene(): SceneHandle {
         vec2 uv = vUv;
         float n = fbm(vec2(uv.x * 3.0 + uTime * 0.18, uv.y * 5.0 + sin(uTime * 0.4) * 0.6));
         float curtain = smoothstep(0.4, 0.78, n);
-        float mask = smoothstep(0.0, 0.22, uv.y) * (1.0 - smoothstep(0.55, 0.95, uv.y));
+        float mask = smoothstep(0.0, 0.22, uv.y) * (1.0 - smoothstep(0.82, 0.98, uv.y));
         float wavy = 0.6 + 0.4 * sin(uv.x * 6.0 + uTime * 0.9);
 
         // 极光颜色随高度分层：低层氮分子呈蓝/紫，中层氧原子呈绿，高层氧原子呈红
@@ -989,18 +1298,42 @@ export function buildAuroraScene(): SceneHandle {
   const aurora = new THREE.Mesh(new THREE.PlaneGeometry(30, 12, 96, 48), auroraMat)
   aurora.position.y = 2.1
   aurora.rotation.x = -0.12
+  markPick(aurora, '极光帘幕')
   group.add(aurora)
+
+  // 极光分层拾取代理：按 shader 里的高度色带切成三段薄盒，
+  // visible=false 不参与绘制，但能按点击高度命中对应层。
+  const layers: { y: number; h: number; name: string }[] = [
+    { y: -0.1, h: 1.8, name: '极光·蓝紫层（氮）' },
+    { y: 2.1, h: 1.8, name: '极光·绿色层（氧）' },
+    { y: 4.6, h: 2.4, name: '极光·红色层（氧）' }
+  ]
+  for (const layer of layers) {
+    group.add(makePickProxy(new THREE.BoxGeometry(30, layer.h, 0.3), layer.name, [0, layer.y, 0], [-0.12, 0, 0]))
+  }
   group.add(makeStarfield(1000))
 
-  return {
+  return decorateScene({
     group,
     update: (t, _dt) => {
       auroraMat.uniforms.uTime.value = t
     },
     camera: { position: [0, 1.4, 8.8] },
     minDistance: 2.5,
-    maxDistance: 26
-  }
+    maxDistance: 26,
+    subjectRadius: 6,
+    boundsRadius: 18,
+    labelAnchors: [
+      { name: '极光·蓝紫层（氮）', position: [0, -0.1, 0] },
+      { name: '极光·绿色层（氧）', position: [0, 2.1, 0] },
+      { name: '极光·红色层（氧）', position: [0, 4.6, 0] }
+    ],
+    scaleRef: {
+      radius: 1,
+      label: '参考球：1 世界单位（极光高度约 100~300 km，场景为示意）',
+      position: [0, -3.4, 0]
+    }
+  }, 'aurora')
 }
 
 export function buildSupernovaScene(): SceneHandle {
@@ -1037,19 +1370,24 @@ export function buildSupernovaScene(): SceneHandle {
 
   const s1 = shell(dirs1, 0xffc48a, 0.16)
   const s2 = shell(dirs2, 0x8fb3ff, 0.12)
+  markPick(s1.pts, '抛射物外壳（暖色）')
+  markPick(s2.pts, '抛射物外壳（蓝色）')
 
   const core = makeGlowSprite('#ffffff', 1.4, 1)
+  markPick(core, '前身星核心')
   group.add(core)
   const flash = makeGlowSprite('#ffe9c0', 5, 0.9)
+  markPick(flash, '爆炸闪光')
   group.add(flash)
 
   // 爆后遗迹：中子星（脉冲星）留在中心
   const pulsar = makeGlowSprite('#bfe9ff', 0.5, 0)
+  markPick(pulsar, '中子星遗迹')
   group.add(pulsar)
   group.add(makeStarfield(900))
 
   const T = 8
-  return {
+  return decorateScene({
     group,
     update: (t, _dt) => {
       const p = (t % T) / T
@@ -1070,8 +1408,19 @@ export function buildSupernovaScene(): SceneHandle {
     },
     camera: { position: [0, 0.4, 9.5] },
     minDistance: 2.5,
-    maxDistance: 30
-  }
+    maxDistance: 30,
+    subjectRadius: 4,
+    boundsRadius: 16,
+    labelAnchors: [
+      { name: '爆炸抛射物', position: [0, 0, 0] },
+      { name: '中子星遗迹', position: [0, 0, 0] }
+    ],
+    scaleRef: {
+      radius: 1,
+      label: '参考球：1 世界单位（抛射速度约 1 万 km/s，场景为示意）',
+      position: [0, -2.2, 0]
+    }
+  }, 'supernova')
 }
 
 export function buildSolarSystemScene(): SceneHandle {
@@ -1115,9 +1464,15 @@ export function buildSolarSystemScene(): SceneHandle {
     new THREE.SphereGeometry(0.85, 48, 48),
     new THREE.MeshBasicMaterial({ color: 0xffd27a })
   )
+  markPick(sun, '太阳')
   group.add(sun)
-  group.add(makeGlowSprite('#ffc46b', 3.4, 0.65))
+  const sunGlow = makeGlowSprite('#ffc46b', 3.4, 0.65)
+  markPick(sunGlow, '太阳日冕')
+  group.add(sunGlow)
 
+  // 轨道线单独成组，便于 Viewer.setOverlay('orbits', …) 开关。
+  const orbitGroup = new THREE.Group()
+  orbitGroup.name = 'overlay-orbits'
   const orbits = planets.map((p) => {
     const dist = 3 + Math.log10(p.au / 0.387) * 5.6
     const pts: THREE.Vector3[] = []
@@ -1127,9 +1482,10 @@ export function buildSolarSystemScene(): SceneHandle {
     }
     const geo = new THREE.BufferGeometry().setFromPoints(pts)
     const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.14 }))
-    group.add(line)
+    orbitGroup.add(line)
     return line
   })
+  group.add(orbitGroup)
 
   const meshes = planets.map((p) => {
     const dist = 3 + Math.log10(p.au / 0.387) * 5.6
@@ -1140,11 +1496,26 @@ export function buildSolarSystemScene(): SceneHandle {
     else map = rockyTexture(p.seed, { land: p.land!, ocean: p.ocean, polar: p.polar, craters: p.craters, darkPatches: p.darkPatches, darkColor: p.darkColor })
 
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(p.r, 40, 40), new THREE.MeshStandardMaterial({ map, roughness: 1 }))
+    markPick(mesh, p.name)
+    if (p.gasSpot) {
+      mesh.rotation.y = p.seed === 55 ? 4.145 : p.seed === 88 ? 0.279 : 0
+      const spot = makeSurfaceSpot({
+        radius: p.r,
+        color: p.gasSpot.color,
+        name: p.name === '木星' ? '大红斑' : '大暗斑',
+        opacity: 0.88
+      })
+      const normal = normalFromUv(p.gasSpot.x, p.gasSpot.y, new THREE.Vector3())
+      placeSurfaceSpot(spot, p.r, normal, p.gasSpot.rx * Math.PI * 2 * p.r, p.gasSpot.ry * Math.PI * p.r)
+      mesh.add(spot)
+    }
     const holder = new THREE.Group()
     holder.rotation.z = THREE.MathUtils.degToRad(p.tilt)
     holder.add(mesh)
     if (p.rings) {
-      holder.add(makeRings(p.r * 1.4, p.r * 2.3, p.seed + 1, ['#e8d5a8', '#d4b57a', '#b98f4e'], p.ringTilt ?? 0, p.ringGaps))
+      const rings = makeRings(p.r * 1.4, p.r * 2.3, p.seed + 1, ['#e8d5a8', '#d4b57a', '#b98f4e'], p.ringTilt ?? 0, p.ringGaps)
+      markPick(rings, p.name === '土星' ? '土星环' : '天王星环')
+      holder.add(rings)
     }
     group.add(holder)
     return { mesh, holder, p, dist, angle: rng() * Math.PI * 2 }
@@ -1152,7 +1523,7 @@ export function buildSolarSystemScene(): SceneHandle {
 
   group.add(makeStarfield(1200))
 
-  return {
+  return decorateScene({
     group,
     update: (_t, dt) => {
       for (const m of meshes) {
@@ -1167,36 +1538,73 @@ export function buildSolarSystemScene(): SceneHandle {
     autoRotate: true,
     autoRotateSpeed: 0.4,
     minDistance: 7,
-    maxDistance: 60
+    maxDistance: 60,
+    subjectRadius: 6,
+    boundsRadius: 14,
+    overlays: { orbits: orbitGroup },
+    labelAnchors: [{ name: '太阳', position: [0, 0, 0] }],
+    scaleRef: {
+      radius: 1,
+      label: '参考球：1 世界单位（轨道半径对数压缩，非真实比例；太阳半径约 69.6 万 km）',
+      position: [0, -3.2, 0]
+    }
+  }, 'solarSystem')
+}
+
+/** 从条目 facts 里取真实直径，生成比例尺参考球说明。 */
+function scaleLabelForEntry(entry: CatalogEntry): string | undefined {
+  if (entry.scene === 'planet' || entry.scene === 'sun' || entry.scene === 'moon') {
+    const d = entry.facts.find((f) => f.label === '直径')?.value
+    if (d) return '参考球：直径 ' + d + '（球径 = 场景主体半径，形状与比例示意）'
   }
+  if (entry.scene === 'comet') {
+    const d = entry.facts.find((f) => f.label === '核心直径')?.value
+    if (d) return '参考球：' + d + '（哈雷彗核实测约 15×8×8 km，形状不规则，示意）'
+  }
+  return undefined
+}
+
+function metaForEntry(entry: CatalogEntry): SceneMeta {
+  const meta: SceneMeta = { name: entry.name }
+  const scaleLabel = scaleLabelForEntry(entry)
+  if (scaleLabel) meta.scaleLabel = scaleLabel
+  return meta
 }
 
 export function buildSceneFor(entry: CatalogEntry): SceneHandle {
   switch (entry.scene) {
     case 'solarSystem':
-      return buildSolarSystemScene()
-    case 'planet':
-      return buildPlanetScene((entry.sceneParams ?? {}) as unknown as PlanetParams)
+      return decorateScene(buildSolarSystemScene(), 'solarSystem', metaForEntry(entry))
+    case 'planet': {
+      const params = { ...(entry.sceneParams ?? {}) } as unknown as PlanetParams
+      params.name = entry.name
+      params.scaleLabel = scaleLabelForEntry(entry) ?? params.scaleLabel
+      if (entry.id === 'saturn') params.ringName = '土星环'
+      if (entry.id === 'uranus') params.ringName = '天王星环'
+      if (entry.id === 'jupiter') params.spotName = '大红斑'
+      if (entry.id === 'neptune') params.spotName = '大暗斑'
+      return decorateScene(buildPlanetScene(params), 'planet', metaForEntry(entry))
+    }
     case 'sun':
-      return buildSunScene()
+      return decorateScene(buildSunScene(), 'sun', metaForEntry(entry))
     case 'moon':
-      return buildMoonScene()
+      return decorateScene(buildMoonScene(), 'moon', metaForEntry(entry))
     case 'blackhole':
-      return buildBlackholeScene()
+      return decorateScene(buildBlackholeScene(), 'blackhole', metaForEntry(entry))
     case 'comet':
-      return buildCometScene()
+      return decorateScene(buildCometScene(), 'comet', metaForEntry(entry))
     case 'nebula':
-      return buildNebulaScene()
+      return decorateScene(buildNebulaScene(), 'nebula', metaForEntry(entry))
     case 'galaxy':
-      return buildGalaxyScene()
+      return decorateScene(buildGalaxyScene(), 'galaxy', metaForEntry(entry))
     case 'meteor':
-      return buildMeteorScene()
+      return decorateScene(buildMeteorScene(), 'meteor', metaForEntry(entry))
     case 'eclipse':
-      return buildEclipseScene()
+      return decorateScene(buildEclipseScene(), 'eclipse', metaForEntry(entry))
     case 'aurora':
-      return buildAuroraScene()
+      return decorateScene(buildAuroraScene(), 'aurora', metaForEntry(entry))
     case 'supernova':
-      return buildSupernovaScene()
+      return decorateScene(buildSupernovaScene(), 'supernova', metaForEntry(entry))
     default:
       throw new Error('unknown scene: ' + entry.scene)
   }
