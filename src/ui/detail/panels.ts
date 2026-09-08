@@ -1,13 +1,13 @@
 /**
- * 详情页四个标签页的内容渲染（工作流 C）。
+ * 详情页四个标签页的内容渲染（工作流 C；第三轮迭代改为按需加载可视化）。
  *
- * 数据标签页：优先消费工作流 A 的 viz + metrics；
- * getMetrics() 返回 undefined、或可视化抛错时，降级为展项自带的 facts 表格，绝不白屏。
+ * 数据标签页：表格（来自 entry.facts）同步渲染，保证永远有内容；
+ * 图表所需的 metrics 数据与 viz 组件是独立 chunk，只有真正打开「数据」页时才
+ * 动态 import，失败时降级为纯表格，绝不白屏。
  */
 import type { CatalogEntry } from '../../types'
-import { getMetrics, type EntryMetrics } from '../../data/metrics'
-import { viz } from '../../viz'
-import type { VizHandle } from '../../viz/types'
+import type { EntryMetrics } from '../../data/metrics'
+import type { VizApi, VizHandle } from '../../viz/types'
 import { entryHistory } from '../../history'
 import { el } from '../dom'
 
@@ -29,6 +29,8 @@ export interface PanelResult {
   el: HTMLElement
   /** 由可视化层创建、需要在切标签时 dispose 的实例。 */
   handles: VizHandle[]
+  /** 取消尚未完成的异步渲染（切标签 / 离开页面），避免迟到的回调写入已卸载的 DOM。 */
+  cancel?: () => void
 }
 
 export function renderPanel(tab: DetailTab, entry: CatalogEntry): PanelResult {
@@ -57,10 +59,9 @@ function textPanel(text: string, label: string): PanelResult {
 
 // -------------------------------------------------------------------- 数据
 
-function safeMetrics(id: string): EntryMetrics | undefined {
+function safeMetrics(id: string, getMetrics: (id: string) => EntryMetrics | undefined): EntryMetrics | undefined {
   try {
-    const m = getMetrics(id)
-    return m ?? undefined
+    return getMetrics(id) ?? undefined
   } catch {
     return undefined
   }
@@ -69,12 +70,66 @@ function safeMetrics(id: string): EntryMetrics | undefined {
 function factsPanel(entry: CatalogEntry): PanelResult {
   const box = el('div', 'dt-tab-body dt-facts')
   const handles: VizHandle[] = []
-  const metrics = safeMetrics(entry.id)
-  const hasMetrics =
-    !!metrics && metrics.scales.length + metrics.gauges.length + metrics.compare.length > 0
+  let cancelled = false
 
-  if (metrics && hasMetrics) {
-    box.appendChild(
+  // 图表区先占位：metrics 数据与 viz 组件都是独立 chunk，打开「数据」页时才下载
+  const charts = el('div', 'dt-charts')
+  const skeleton = el('div', 'dt-charts-skeleton hud-frame')
+  skeleton.appendChild(el('span', 'hud-label dt-charts-skeleton-tag', 'LOADING VIZ'))
+  skeleton.appendChild(el('p', 'dt-charts-skeleton-text', '正在加载数据可视化组件…'))
+  charts.appendChild(skeleton)
+  box.appendChild(charts)
+
+  // 表格只依赖 entry.facts，同步渲染：即使可视化组件下载失败也有内容可读
+  const tableHead = el('div', 'dt-facts-head')
+  tableHead.appendChild(el('div', 'hud-label dt-tab-kicker', '观测数据'))
+  box.appendChild(tableHead)
+
+  const table = el('table', 'dt-table')
+  const tbody = el('tbody')
+  for (const f of entry.facts) {
+    const tr = el('tr')
+    const th = el('th')
+    th.scope = 'row'
+    th.textContent = f.label
+    const td = el('td')
+    td.textContent = f.value
+    tr.appendChild(th)
+    tr.appendChild(td)
+    tbody.appendChild(tr)
+  }
+  table.appendChild(tbody)
+  box.appendChild(table)
+
+  void (async () => {
+    let getMetrics: (id: string) => EntryMetrics | undefined
+    let viz: VizApi
+    try {
+      const [metricsMod, vizMod] = await Promise.all([import('../../data/metrics'), import('../../viz')])
+      getMetrics = metricsMod.getMetrics
+      viz = vizMod.viz
+    } catch {
+      if (cancelled) return
+      charts.replaceChildren(
+        el('p', 'dt-viz-fallback', '数据可视化组件加载失败，下方表格为原始数据。')
+      )
+      return
+    }
+    if (cancelled) return
+
+    const metrics = safeMetrics(entry.id, getMetrics)
+    const hasMetrics =
+      !!metrics && metrics.scales.length + metrics.gauges.length + metrics.compare.length > 0
+
+    if (!metrics || !hasMetrics) {
+      charts.replaceChildren(
+        el('p', 'dt-lead', '该展项暂未接入量化可视化，以下为展项自带的观测数据表。')
+      )
+      return
+    }
+
+    const parts: HTMLElement[] = []
+    parts.push(
       el(
         'p',
         'dt-lead',
@@ -96,7 +151,7 @@ function factsPanel(entry: CatalogEntry): PanelResult {
       } catch {
         vizFailed(block.host, '尺度对比图未能渲染，可查看下方原始数据。')
       }
-      box.appendChild(block.box)
+      parts.push(block.box)
     }
 
     if (metrics.gauges.length > 0) {
@@ -106,7 +161,7 @@ function factsPanel(entry: CatalogEntry): PanelResult {
       } catch {
         vizFailed(block.host, '数值仪表未能渲染，可查看下方原始数据。')
       }
-      box.appendChild(block.box)
+      parts.push(block.box)
     }
 
     if (metrics.compare.length > 0) {
@@ -121,36 +176,19 @@ function factsPanel(entry: CatalogEntry): PanelResult {
       } catch {
         vizFailed(block.host, '对比矩阵未能渲染，可查看下方原始数据。')
       }
-      box.appendChild(block.box)
+      parts.push(block.box)
     }
-  } else {
-    box.appendChild(
-      el('p', 'dt-lead', '该展项暂未接入量化可视化，以下为展项自带的观测数据表。')
-    )
+
+    charts.replaceChildren(...parts)
+  })()
+
+  return {
+    el: box,
+    handles,
+    cancel: () => {
+      cancelled = true
+    }
   }
-
-  const tableHead = el('div', 'dt-facts-head')
-  tableHead.appendChild(el('div', 'hud-label dt-tab-kicker', metrics && hasMetrics ? '原始数据' : '观测数据'))
-  if (metrics && hasMetrics) tableHead.appendChild(el('span', 'dt-facts-hint', '单位见数值'))
-  box.appendChild(tableHead)
-
-  const table = el('table', 'dt-table')
-  const tbody = el('tbody')
-  for (const f of entry.facts) {
-    const tr = el('tr')
-    const th = el('th')
-    th.scope = 'row'
-    th.textContent = f.label
-    const td = el('td')
-    td.textContent = f.value
-    tr.appendChild(th)
-    tr.appendChild(td)
-    tbody.appendChild(tr)
-  }
-  table.appendChild(tbody)
-  box.appendChild(table)
-
-  return { el: box, handles }
 }
 
 function vizBlock(title: string, tag: string): { box: HTMLElement; host: HTMLElement } {

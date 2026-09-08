@@ -12,10 +12,39 @@ export function mulberry32(seed: number) {
   }
 }
 
-function hash21(x: number, y: number, seed: number) {
-  let h = seed ^ Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263)
-  h = Math.imul(h ^ (h >>> 13), 1274126177)
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296
+/**
+ * 每颗种子一张 256×256 可平铺随机值表。
+ *
+ * 旧实现每像素要算 4 次整数哈希（fbm 5 个八度 = 20 次/像素），一张 512×256
+ * 球面纹理就是 260 万次哈希 —— 实测占场景构建主线程时间的三分之一。
+ * 改成查表 + 双线性插值后噪声特征不变，每像素只剩 4 次数组读取。
+ */
+const NOISE_SIZE = 256
+const NOISE_MASK = NOISE_SIZE - 1
+let noiseTable: Float32Array | null = null
+
+/** 全局唯一的随机值表：只建一次（65k 个浮点），所有种子共用。 */
+function baseNoiseTable(): Float32Array {
+  if (noiseTable) return noiseTable
+  const rng = mulberry32(0x9e3779b9)
+  const table = new Float32Array(NOISE_SIZE * NOISE_SIZE)
+  for (let i = 0; i < table.length; i++) table[i] = rng()
+  noiseTable = table
+  return table
+}
+
+/**
+ * 用种子算出一个整数偏移（外加是否交换 x/y 轴）。
+ *
+ * 早先按种子各建一张表的做法反而更慢：fbm 每个八度换一次种子，
+ * 一张 512×256 纹理要新建几十张表，光建表就吃掉 47ms。
+ * 现在共用一张表，靠偏移 + 轴交换让不同种子看起来互不相关。
+ */
+function seedKey(seed: number): number {
+  let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b) >>> 0
+  h ^= h >>> 13
+  h = Math.imul(h, 0xc2b2ae35) >>> 0
+  return h ^ (h >>> 16)
 }
 
 function smooth(t: number) {
@@ -23,16 +52,25 @@ function smooth(t: number) {
 }
 
 export function valueNoise(x: number, y: number, seed = 1) {
+  const table = baseNoiseTable()
+  const key = seedKey(seed)
+  if (key & 0x10000) {
+    const t = x
+    x = y
+    y = t
+  }
   const xi = Math.floor(x)
   const yi = Math.floor(y)
-  const xf = x - xi
-  const yf = y - yi
-  const a = hash21(xi, yi, seed)
-  const b = hash21(xi + 1, yi, seed)
-  const c = hash21(xi, yi + 1, seed)
-  const d = hash21(xi + 1, yi + 1, seed)
-  const u = smooth(xf)
-  const v = smooth(yf)
+  const row0 = ((yi + (key >>> 8)) & NOISE_MASK) << 8
+  const row1 = ((yi + (key >>> 8) + 1) & NOISE_MASK) << 8
+  const x0 = (xi + key) & NOISE_MASK
+  const x1 = (xi + key + 1) & NOISE_MASK
+  const a = table[row0 + x0]
+  const b = table[row0 + x1]
+  const c = table[row1 + x0]
+  const d = table[row1 + x1]
+  const u = smooth(x - xi)
+  const v = smooth(y - yi)
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v
 }
 
@@ -62,17 +100,44 @@ function hexToRgb(hex: string): RGB {
   ]
 }
 
-function mixRgb(a: RGB, b: RGB, t: number): RGB {
-  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
+/**
+ * 颜色运算一律「就地写入 out」，不再每像素 new 一个 [r,g,b]。
+ * 一张 512×256 纹理的内层循环要做十几次混色，旧写法会产生上百万次小数组分配，
+ * 实测正是 rockyTexture 主线程耗时的主要来源（配合 GC 抖动）。
+ */
+function mixInto(out: RGB, a: RGB, b: RGB, t: number): RGB {
+  out[0] = a[0] + (b[0] - a[0]) * t
+  out[1] = a[1] + (b[1] - a[1]) * t
+  out[2] = a[2] + (b[2] - a[2]) * t
+  return out
 }
 
-function sample(palette: RGB[], t: number): RGB {
-  const tt = Math.min(1, Math.max(0, t))
+function setInto(out: RGB, a: RGB): RGB {
+  out[0] = a[0]
+  out[1] = a[1]
+  out[2] = a[2]
+  return out
+}
+
+function sampleInto(out: RGB, palette: RGB[], t: number): RGB {
+  const tt = t < 0 ? 0 : t > 1 ? 1 : t
   const i0 = Math.floor(tt * (palette.length - 1))
   const i1 = Math.min(palette.length - 1, i0 + 1)
-  const f = tt * (palette.length - 1) - i0
-  return mixRgb(palette[i0], palette[i1], smooth(f))
+  const f = smooth(tt * (palette.length - 1) - i0)
+  return mixInto(out, palette[i0], palette[i1], f)
 }
+
+// 常用常量色（避免内层循环里反复构造字面量数组）
+const DEEP_SEA: RGB = [18, 34, 66]
+const SHADE_DARK: RGB = [8, 10, 16]
+const POLAR_ICE: RGB = [236, 242, 250]
+const CRATER_DARK: RGB = [26, 28, 38]
+const MOON_BASE: RGB = [172, 174, 180]
+const MOON_DARK: RGB = [120, 122, 132]
+const MOON_BRIGHT: RGB = [208, 210, 216]
+const MOON_CRATER: RGB = [52, 54, 62]
+const PURE_BLACK: RGB = [0, 0, 0]
+const VENUS_HAZE: RGB = [255, 250, 230]
 
 // --------------------------------------------------------------- canvas ---
 function makeCanvas(w: number, h: number) {
@@ -108,12 +173,16 @@ export interface RockyOpts {
   brightColor?: string
 }
 
-export function rockyTexture(seed: number, opts: RockyOpts): THREE.Texture {
-  const key = 'rocky|' + seed + '|' + JSON.stringify(opts)
+/**
+ * size 为纹理宽度（高度取一半，等距圆柱投影）。远景 / 概览场景用 256 就够，
+ * 近距离单体场景用默认 512；分辨率进缓存键，避免同种子不同档位互相污染。
+ */
+export function rockyTexture(seed: number, opts: RockyOpts, size = 512): THREE.Texture {
+  const key = 'rocky|' + seed + '|' + size + '|' + JSON.stringify(opts)
   const hit = cache.get(key)
   if (hit) return hit
-  const w = 512
-  const h = 256
+  const w = size
+  const h = size >> 1
   const { canvas, ctx } = makeCanvas(w, h)
   const img = ctx.createImageData(w, h)
   const data = img.data
@@ -136,53 +205,49 @@ export function rockyTexture(seed: number, opts: RockyOpts): THREE.Texture {
     bright.push({ x: rng(), y: rng(), rx: 0.06 + rng() * 0.16, ry: 0.03 + rng() * 0.09, color: hexToRgb(opts.brightColor ?? '#f5ead2') })
   }
   const hasOcean = !!ocean
+  const col: RGB = [0, 0, 0]
   for (let y = 0; y < h; y++) {
     const v = y / h
     for (let x = 0; x < w; x++) {
       const u = x / w
       const n = fbm(u * 5, v * 5, seed, 5)
-      let col: RGB
       if (hasOcean && n < 0.42) {
         const depth = 1 - n / 0.42
-        col = mixRgb(ocean!, [18, 34, 66], depth * 0.7)
+        mixInto(col, ocean!, DEEP_SEA, depth * 0.7)
       } else {
         const t = hasOcean ? (n - 0.42) / 0.58 : n
-        col = sample(land, Math.min(1, Math.max(0, t)))
+        sampleInto(col, land, t)
         const shade = 0.82 + 0.3 * fbm(u * 14, v * 14, seed + 7, 3)
-        col = mixRgb(col, [8, 10, 16], (1 - shade) * 0.45)
+        mixInto(col, col, SHADE_DARK, (1 - shade) * 0.45)
       }
       if (opts.polar) {
         let cap = 0
         if (v < 0.17) cap = 1 - v / 0.17
         else if (v > 0.83) cap = (v - 0.83) / 0.17
-        col = mixRgb(col, [236, 242, 250], Math.pow(cap, 1.6) * 0.9)
+        mixInto(col, col, POLAR_ICE, Math.pow(cap, 1.6) * 0.9)
       }
-      for (const c of craters) {
+      for (let k = 0; k < craters.length; k++) {
+        const c = craters[k]
         const dx = u - c.x
         const dy = v - c.y
         const d2 = dx * dx + dy * dy
         if (d2 < c.r * c.r) {
-          const d = Math.sqrt(d2) / c.r
-          col = mixRgb(col, [26, 28, 38], (1 - d) * 0.65)
+          mixInto(col, col, CRATER_DARK, (1 - Math.sqrt(d2) / c.r) * 0.65)
         }
       }
-      for (const p of dark) {
+      for (let k = 0; k < dark.length; k++) {
+        const p = dark[k]
         const dx = (u - p.x) / p.rx
         const dy = (v - p.y) / p.ry
         const d2 = dx * dx + dy * dy
-        if (d2 < 1) {
-          const d = Math.sqrt(d2)
-          col = mixRgb(col, p.color, (1 - d) * 0.55)
-        }
+        if (d2 < 1) mixInto(col, col, p.color, (1 - Math.sqrt(d2)) * 0.55)
       }
-      for (const p of bright) {
+      for (let k = 0; k < bright.length; k++) {
+        const p = bright[k]
         const dx = (u - p.x) / p.rx
         const dy = (v - p.y) / p.ry
         const d2 = dx * dx + dy * dy
-        if (d2 < 1) {
-          const d = Math.sqrt(d2)
-          col = mixRgb(col, p.color, (1 - d) * 0.4)
-        }
+        if (d2 < 1) mixInto(col, col, p.color, (1 - Math.sqrt(d2)) * 0.4)
       }
       const i = (y * w + x) * 4
       data[i] = col[0]
@@ -201,12 +266,12 @@ export interface GasOpts {
   spot?: { x: number; y: number; rx: number; ry: number; color: string }
 }
 
-export function gasTexture(seed: number, colors: string[], opts: GasOpts = {}): THREE.Texture {
-  const key = 'gas|' + seed + '|' + colors.join(',') + '|' + JSON.stringify(opts)
+export function gasTexture(seed: number, colors: string[], opts: GasOpts = {}, size = 512): THREE.Texture {
+  const key = 'gas|' + seed + '|' + size + '|' + colors.join(',') + '|' + JSON.stringify(opts)
   const hit = cache.get(key)
   if (hit) return hit
-  const w = 512
-  const h = 256
+  const w = size
+  const h = size >> 1
   const { canvas, ctx } = makeCanvas(w, h)
   const img = ctx.createImageData(w, h)
   const data = img.data
@@ -215,6 +280,7 @@ export function gasTexture(seed: number, colors: string[], opts: GasOpts = {}): 
   const spot = opts.spot
     ? { x: opts.spot.x, y: opts.spot.y, rx: opts.spot.rx, ry: opts.spot.ry, color: hexToRgb(opts.spot.color) }
     : null
+  const col: RGB = [0, 0, 0]
   for (let y = 0; y < h; y++) {
     const v = y / h
     for (let x = 0; x < w; x++) {
@@ -225,17 +291,14 @@ export function gasTexture(seed: number, colors: string[], opts: GasOpts = {}): 
       const t = bandPos - i0
       const c0 = pal[((i0 % bands) + bands) % bands]
       const c1 = pal[(((i0 + 1) % bands) + bands) % bands]
-      let col = mixRgb(c0, c1, smooth(Math.min(1, Math.max(0, t))))
+      mixInto(col, c0, c1, smooth(t < 0 ? 0 : t > 1 ? 1 : t))
       const shade = 0.72 + 0.38 * fbm(u * 22, v * 26, seed + 3, 4)
-      col = mixRgb(col, [0, 0, 0], (1 - shade) * 0.5)
+      mixInto(col, col, PURE_BLACK, (1 - shade) * 0.5)
       if (spot) {
         const dx = (u - spot.x) / spot.rx
         const dy = (v - spot.y) / spot.ry
         const d2 = dx * dx + dy * dy
-        if (d2 < 1) {
-          const d = Math.sqrt(d2)
-          col = mixRgb(col, spot.color, (1 - d) * 0.85)
-        }
+        if (d2 < 1) mixInto(col, col, spot.color, (1 - Math.sqrt(d2)) * 0.85)
       }
       const i = (y * w + x) * 4
       data[i] = col[0]
@@ -250,12 +313,12 @@ export function gasTexture(seed: number, colors: string[], opts: GasOpts = {}): 
   return tex
 }
 
-export function venusTexture(seed: number): THREE.Texture {
-  const key = 'venus|' + seed
+export function venusTexture(seed: number, size = 512): THREE.Texture {
+  const key = 'venus|' + seed + '|' + size
   const hit = cache.get(key)
   if (hit) return hit
-  const w = 512
-  const h = 256
+  const w = size
+  const h = size >> 1
   const { canvas, ctx } = makeCanvas(w, h)
   const img = ctx.createImageData(w, h)
   const data = img.data
@@ -265,16 +328,17 @@ export function venusTexture(seed: number): THREE.Texture {
     hexToRgb('#dcc58a'),
     hexToRgb('#f4e8c8')
   ]
+  const col: RGB = [0, 0, 0]
   for (let y = 0; y < h; y++) {
     const v = y / h
     for (let x = 0; x < w; x++) {
       const u = x / w
       const d = fbm(u * 2.5, v * 6, seed, 4)
-      let col = sample(pal, 0.5 + (d - 0.5) * 0.8)
+      sampleInto(col, pal, 0.5 + (d - 0.5) * 0.8)
       const streak = fbm(u * 10 + 0.4 * fbm(u * 3, v * 8, seed + 2, 3), v * 14, seed + 4, 3)
-      col = mixRgb(col, [255, 250, 230], (Math.max(0, streak - 0.62) / 0.38) * 0.22)
+      mixInto(col, col, VENUS_HAZE, (Math.max(0, streak - 0.62) / 0.38) * 0.22)
       const shade = 0.96 + 0.08 * fbm(u * 20, v * 20, seed + 6, 2)
-      col = mixRgb(col, [0, 0, 0], (1 - shade) * 0.45)
+      mixInto(col, col, PURE_BLACK, (1 - shade) * 0.45)
       const i = (y * w + x) * 4
       data[i] = col[0]
       data[i + 1] = col[1]
@@ -288,20 +352,24 @@ export function venusTexture(seed: number): THREE.Texture {
   return tex
 }
 
-export function earthTexture(seed: number): THREE.Texture {
-  return rockyTexture(seed, {
-    ocean: '#1d4f9c',
-    land: ['#3d7a3a', '#6d9b4a', '#8a6f3f', '#b39a6b', '#d8cfb2'],
-    polar: true
-  })
+export function earthTexture(seed: number, size = 512): THREE.Texture {
+  return rockyTexture(
+    seed,
+    {
+      ocean: '#1d4f9c',
+      land: ['#3d7a3a', '#6d9b4a', '#8a6f3f', '#b39a6b', '#d8cfb2'],
+      polar: true
+    },
+    size
+  )
 }
 
-export function cloudTexture(seed: number): THREE.Texture {
-  const key = 'cloud|' + seed
+export function cloudTexture(seed: number, size = 512): THREE.Texture {
+  const key = 'cloud|' + seed + '|' + size
   const hit = cache.get(key)
   if (hit) return hit
-  const w = 512
-  const h = 256
+  const w = size
+  const h = size >> 1
   const { canvas, ctx } = makeCanvas(w, h)
   const img = ctx.createImageData(w, h)
   const data = img.data
@@ -324,12 +392,12 @@ export function cloudTexture(seed: number): THREE.Texture {
   return tex
 }
 
-export function moonTexture(seed: number): THREE.Texture {
-  const key = 'moon|' + seed
+export function moonTexture(seed: number, size = 512): THREE.Texture {
+  const key = 'moon|' + seed + '|' + size
   const hit = cache.get(key)
   if (hit) return hit
-  const w = 512
-  const h = 256
+  const w = size
+  const h = size >> 1
   const { canvas, ctx } = makeCanvas(w, h)
   const img = ctx.createImageData(w, h)
   const data = img.data
@@ -338,21 +406,23 @@ export function moonTexture(seed: number): THREE.Texture {
   for (let k = 0; k < 90; k++) {
     craters.push({ x: rng(), y: rng(), r: 0.015 + rng() * 0.1 })
   }
+  const col: RGB = [0, 0, 0]
   for (let y = 0; y < h; y++) {
     const v = y / h
     for (let x = 0; x < w; x++) {
       const u = x / w
-      let col: RGB = [172, 174, 180]
       const n = fbm(u * 6, v * 6, seed, 5)
-      col = mixRgb(col, [120, 122, 132], Math.max(0, 0.52 - n) / 0.52 * 0.7)
-      col = mixRgb(col, [208, 210, 216], Math.max(0, n - 0.55) / 0.45 * 0.6)
-      for (const c of craters) {
+      setInto(col, MOON_BASE)
+      mixInto(col, col, MOON_DARK, (Math.max(0, 0.52 - n) / 0.52) * 0.7)
+      mixInto(col, col, MOON_BRIGHT, (Math.max(0, n - 0.55) / 0.45) * 0.6)
+      for (let k = 0; k < craters.length; k++) {
+        const c = craters[k]
         const dx = u - c.x
         const dy = v - c.y
         const d2 = dx * dx + dy * dy
         if (d2 < c.r * c.r) {
           const d = Math.sqrt(d2) / c.r
-          col = mixRgb(col, [52, 54, 62], Math.pow(1 - d, 1.4) * 0.9)
+          mixInto(col, col, MOON_CRATER, Math.pow(1 - d, 1.4) * 0.9)
         }
       }
       const i = (y * w + x) * 4
@@ -368,12 +438,12 @@ export function moonTexture(seed: number): THREE.Texture {
   return tex
 }
 
-export function sunTexture(seed: number): THREE.Texture {
-  const key = 'sun|' + seed
+export function sunTexture(seed: number, size = 512): THREE.Texture {
+  const key = 'sun|' + seed + '|' + size
   const hit = cache.get(key)
   if (hit) return hit
-  const w = 512
-  const h = 256
+  const w = size
+  const h = size >> 1
   const { canvas, ctx } = makeCanvas(w, h)
   const img = ctx.createImageData(w, h)
   const data = img.data
@@ -383,12 +453,13 @@ export function sunTexture(seed: number): THREE.Texture {
     [255, 110, 20],
     [255, 246, 200]
   ]
+  const col: RGB = [0, 0, 0]
   for (let y = 0; y < h; y++) {
     const v = y / h
     for (let x = 0; x < w; x++) {
       const u = x / w
       const n = fbm(u * 7, v * 7, seed, 6)
-      const col = sample(pal, n)
+      sampleInto(col, pal, n)
       const i = (y * w + x) * 4
       data[i] = col[0]
       data[i + 1] = col[1]
@@ -408,18 +479,19 @@ export function ringTexture(
   outer: number,
   seed: number,
   colors: string[],
-  gaps: [number, number][] = []
+  gaps: [number, number][] = [],
+  size = 512
 ): THREE.Texture {
-  const key = 'ring|' + seed + '|' + colors.join(',') + '|' + JSON.stringify(gaps)
+  const key = 'ring|' + seed + '|' + size + '|' + colors.join(',') + '|' + JSON.stringify(gaps)
   const hit = cache.get(key)
   if (hit) return hit
-  const size = 512
   const { canvas, ctx } = makeCanvas(size, size)
   const img = ctx.createImageData(size, size)
   const data = img.data
   const pal = colors.map(hexToRgb)
   const ir = inner / outer
   const cx = size / 2
+  const col: RGB = [0, 0, 0]
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dx = (x + 0.5 - cx) / cx
@@ -432,7 +504,7 @@ export function ringTexture(
       }
       const t = (d - ir) / (1 - ir)
       const band = fbm(t * 16, 0.5, seed, 3)
-      let col = sample(pal, t + band * 0.4)
+      sampleInto(col, pal, t + band * 0.4)
       let a = 0.8 * (0.55 + 0.45 * Math.sin(t * 52 + band * 14)) *
         smoothstep(0, 0.05, t) * (1 - smoothstep(0.86, 1, t))
       for (const [g0, g1] of gaps) {

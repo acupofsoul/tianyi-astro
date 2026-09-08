@@ -5,8 +5,7 @@
  * 深链：#/p/<id>?tab=intro|science|facts|history
  * 键盘：←/→ 上/下一条目，1~4 切标签，空格暂停，R 重置视角，Esc 关卡片。
  */
-import { Viewer } from '../viewer'
-import { buildSceneFor } from '../scenes'
+import type { Viewer } from '../viewer'
 import { getEntry, catalog } from '../catalog'
 import type { CatalogEntry } from '../types'
 import { el, clear } from './dom'
@@ -205,11 +204,15 @@ export function renderDetail(root: HTMLElement, rawId: string) {
   let drawer: DrawerHandle | null = null
   let unbindKeys: (() => void) | null = null
   let vizHandles: VizHandle[] = []
+  let panelCancel: (() => void) | null = null
   let readyTimer = 0
   let disposed = false
 
   // ------------------------------------------------------------ 标签页渲染
   function applyTab(tab: DetailTab) {
+    // 先取消上一个页签尚未完成的异步渲染，再卸载它的可视化实例
+    panelCancel?.()
+    panelCancel = null
     for (const h of vizHandles) {
       try {
         h.dispose()
@@ -222,6 +225,7 @@ export function renderDetail(root: HTMLElement, rawId: string) {
     const result = renderPanel(tab, item)
     panelBody.appendChild(result.el)
     vizHandles = result.handles
+    panelCancel = result.cancel ?? null
     panelBody.setAttribute('aria-label', item.name + ' · ' + labelOf(tab))
     scroll.scrollTop = 0
     if (!disposed) {
@@ -253,6 +257,8 @@ export function renderDetail(root: HTMLElement, rawId: string) {
   registerCleanup(() => {
     disposed = true
     window.clearTimeout(readyTimer)
+    panelCancel?.()
+    panelCancel = null
     for (const h of vizHandles) {
       try {
         h.dispose()
@@ -301,22 +307,49 @@ export function renderDetail(root: HTMLElement, rawId: string) {
     }
   })
 
-  // 先让骨架/加载态有机会上屏，再构建场景（构建是同步的重活）
+  // 先让骨架/加载态有机会上屏，再异步加载三维引擎并构建场景
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
-      if (!disposed) boot()
+      void boot()
     })
   })
 
-  function boot() {
+  /**
+   * 三维引擎（three.js + 场景模块）不在详情页的关键路径上：外壳、文字、
+   * 数据表先渲染，这里再按需拉取。引擎到达前加载态已经在屏上，用户不会看到空白。
+   */
+  async function boot(): Promise<void> {
+    if (disposed) return
+    type ViewerCtor = typeof import('../viewer')['Viewer']
+    type BuildScene = typeof import('../scenes')['buildSceneFor']
+
+    let ViewerCtor: ViewerCtor
+    let buildSceneFor: BuildScene
+    const engineStart = performance.now()
     try {
-      viewer = new Viewer(canvas)
+      const [viewerMod, sceneMod] = await Promise.all([import('../viewer'), import('../scenes')])
+      ViewerCtor = viewerMod.Viewer
+      buildSceneFor = sceneMod.buildSceneFor
+    } catch (err) {
+      if (disposed) return
+      console.error('[detail] 三维引擎加载失败', err)
+      degrade('三维引擎加载失败（可能是网络中断）；文字与数据内容仍可正常浏览。')
+      return
+    }
+    if (disposed) return
+    // 引擎 chunk 到达耗时（含网络 / 解析 / 求值），供 perf 脚本读取
+    performance.measure('tianyi:engine-load', { start: engineStart })
+    loading.stage('正在构建三维场景')
+
+    try {
+      viewer = new ViewerCtor(canvas)
     } catch {
       viewer = null
       degrade('当前浏览器或设备不支持 WebGL，三维视图不可用；文字与数据内容仍可正常浏览。')
       return
     }
     const v = viewer
+    const sceneStart = performance.now()
     try {
       v.load(buildSceneFor(item))
     } catch {
@@ -325,6 +358,9 @@ export function renderDetail(root: HTMLElement, rawId: string) {
       degrade('三维场景构建失败；文字与数据内容仍可正常浏览。')
       return
     }
+
+    // 场景构建（程序化纹理 + 几何）耗时：这是三维页最重的一段同步工作
+    performance.measure('tianyi:scene-build', { start: sceneStart })
 
     v.onPick((info) => {
       if (info) pickCard.show(info)

@@ -219,11 +219,12 @@ function makeRings(
   seed: number,
   colors: string[],
   tiltDeg = 0,
-  gaps: [number, number][] = []
+  gaps: [number, number][] = [],
+  texSize = 512
 ): THREE.Mesh {
   const geo = new THREE.RingGeometry(inner, outer, 128, 1)
   const mat = new THREE.MeshBasicMaterial({
-    map: ringTexture(inner, outer, seed, colors, gaps),
+    map: ringTexture(inner, outer, seed, colors, gaps, texSize),
     side: THREE.DoubleSide,
     transparent: true,
     depthWrite: false
@@ -1487,13 +1488,16 @@ export function buildSolarSystemScene(): SceneHandle {
   })
   group.add(orbitGroup)
 
+  // 概览视角下每颗行星在屏幕上只有几十像素，256 宽纹理足够；
+  // 单体展项（buildPlanetScene）仍用 512，保证近观时的细节。
+  const OVERVIEW_TEX = 256
   const meshes = planets.map((p) => {
     const dist = 3 + Math.log10(p.au / 0.387) * 5.6
     let map: THREE.Texture
-    if (p.kind === 'venus') map = venusTexture(p.seed)
-    else if (p.kind === 'earth') map = earthTexture(p.seed)
-    else if (p.kind === 'gas' || p.kind === 'ice') map = gasTexture(p.seed, p.gasColors!, { spot: p.gasSpot })
-    else map = rockyTexture(p.seed, { land: p.land!, ocean: p.ocean, polar: p.polar, craters: p.craters, darkPatches: p.darkPatches, darkColor: p.darkColor })
+    if (p.kind === 'venus') map = venusTexture(p.seed, OVERVIEW_TEX)
+    else if (p.kind === 'earth') map = earthTexture(p.seed, OVERVIEW_TEX)
+    else if (p.kind === 'gas' || p.kind === 'ice') map = gasTexture(p.seed, p.gasColors!, { spot: p.gasSpot }, OVERVIEW_TEX)
+    else map = rockyTexture(p.seed, { land: p.land!, ocean: p.ocean, polar: p.polar, craters: p.craters, darkPatches: p.darkPatches, darkColor: p.darkColor }, OVERVIEW_TEX)
 
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(p.r, 40, 40), new THREE.MeshStandardMaterial({ map, roughness: 1 }))
     markPick(mesh, p.name)
@@ -1513,7 +1517,7 @@ export function buildSolarSystemScene(): SceneHandle {
     holder.rotation.z = THREE.MathUtils.degToRad(p.tilt)
     holder.add(mesh)
     if (p.rings) {
-      const rings = makeRings(p.r * 1.4, p.r * 2.3, p.seed + 1, ['#e8d5a8', '#d4b57a', '#b98f4e'], p.ringTilt ?? 0, p.ringGaps)
+      const rings = makeRings(p.r * 1.4, p.r * 2.3, p.seed + 1, ['#e8d5a8', '#d4b57a', '#b98f4e'], p.ringTilt ?? 0, p.ringGaps, 256)
       markPick(rings, p.name === '土星' ? '土星环' : '天王星环')
       holder.add(rings)
     }

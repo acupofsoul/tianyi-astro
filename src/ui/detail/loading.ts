@@ -6,6 +6,8 @@ import { el } from '../dom'
  */
 export interface LoadingHandle {
   el: HTMLElement
+  /** 更新加载阶段文案（例如「正在加载三维引擎」→「正在构建场景」）。 */
+  stage(text: string): void
   ready(): void
   fail(message: string): void
   dispose(): void
@@ -20,9 +22,9 @@ export function createLoading(entryName: string, enName: string): LoadingHandle 
   const ring = el('div', 'dt-loading-ring')
   ring.setAttribute('aria-hidden', 'true')
   const title = el('div', 'dt-loading-title')
-  title.textContent = '正在构建三维场景'
+  title.textContent = '正在加载三维引擎'
   const sub = el('div', 'hud-label dt-loading-sub')
-  sub.textContent = 'SCENE BUILDING · ' + enName
+  sub.textContent = 'ENGINE LOADING · ' + enName
   const bar = el('div', 'dt-loading-bar')
   bar.appendChild(el('span', 'dt-loading-bar-fill'))
   const name = el('div', 'dt-loading-name')
@@ -39,6 +41,10 @@ export function createLoading(entryName: string, enName: string): LoadingHandle 
 
   return {
     el: box,
+    stage(text: string) {
+      if (box.classList.contains('dt-loading-fail')) return
+      title.textContent = text
+    },
     ready() {
       if (box.classList.contains('dt-loading-out')) return
       box.classList.add('dt-loading-out')

@@ -4,11 +4,64 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="知天易 —— 基于科学数据的 3D 交互式天文科普网站，探索太阳系、行星、黑洞、彗星等天文现象。" />
+    <meta name="theme-color" content="#04070f" />
     <title>知天易 · 3D 天文科学馆</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌌</text></svg>" />
+    <!--
+      首屏关键样式（内联）：让浏览器在 JS / 主样式表到达之前就能画出启动画面，
+      避免白屏。这段 CSS 只服务于 #boot，主样式表到达后 #app 会被路由清空，
+      #boot 随之移除，不影响后续布局。
+    -->
+    <style>
+      *,*::before,*::after{box-sizing:border-box}
+      html,body{margin:0;padding:0;background:#04070f;color:#dbe7ff;
+        font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,-apple-system,sans-serif}
+      #app{min-height:100vh}
+      .boot{position:fixed;inset:0;display:grid;place-content:center;justify-items:center;
+        gap:15px;padding:24px;text-align:center}
+      .boot-ring{position:relative;width:74px;height:74px;border-radius:50%;
+        border:1px solid rgba(95,214,255,.2);border-top-color:#5fd6ff;
+        animation:boot-spin 1.1s linear infinite;box-shadow:0 0 34px rgba(95,214,255,.16)}
+      .boot-ring::after{content:"";position:absolute;inset:11px;border-radius:50%;
+        border:1px solid rgba(95,214,255,.14);border-bottom-color:rgba(95,214,255,.55);
+        animation:boot-spin 1.7s linear infinite reverse}
+      .boot-brand{margin:0;font-size:34px;font-weight:500;letter-spacing:.4em;
+        text-indent:.4em;color:#eaf3ff}
+      .boot-label{margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+        font-size:10px;letter-spacing:.26em;color:#5fd6ff;opacity:.78}
+      .boot-bar{width:186px;height:2px;border-radius:2px;overflow:hidden;
+        background:rgba(95,214,255,.14)}
+      .boot-bar span{display:block;width:40%;height:100%;
+        background:linear-gradient(90deg,transparent,#5fd6ff,transparent);
+        animation:boot-slide 1.25s ease-in-out infinite}
+      .boot-note{margin:0;font-size:12px;letter-spacing:.06em;color:#7f90ad}
+      .boot-fail{margin:0;font-size:13px;color:#ffb347}
+      @keyframes boot-spin{to{transform:rotate(360deg)}}
+      @keyframes boot-slide{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+      @media (prefers-reduced-motion:reduce){
+        .boot-ring,.boot-ring::after,.boot-bar span{animation:none}
+      }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="boot" id="boot">
+        <div class="boot-ring" aria-hidden="true"></div>
+        <p class="boot-brand">知天易</p>
+        <p class="boot-label">TIANYI · ASTRONOMY ARCHIVE</p>
+        <div class="boot-bar" aria-hidden="true"><span></span></div>
+        <p class="boot-note">正在初始化天文数据库…</p>
+        <noscript><p class="boot-fail">本站的三维天文场景需要启用 JavaScript。</p></noscript>
+      </div>
+    </div>
+    <script>
+      setTimeout(function () {
+        var b = document.getElementById('boot');
+        if (!b) return;
+        var n = b.querySelector('.boot-note');
+        if (n) n.textContent = '仍在加载三维引擎，请稍候…';
+      }, 8000);
+    </script>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
