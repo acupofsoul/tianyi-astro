@@ -1,0 +1,703 @@
+/* ============================================================
+   全局科幻 HUD 皮肤
+   所有者：工作流 E（科幻视觉系统）
+   只在本文件中写属于该工作流的样式；不要修改其他 CSS 文件。
+   可用 token 见 src/styles/tokens.css（--hud-*、--mono、--ease-out …）
+
+   设计原则
+   1) 叠加式覆盖：全部为"追加"，不删除/不重写既有规则（style.css 3 层 + 各工作流 CSS）。
+      选择器统一用 `body ` 前缀提高一档特异性（0,1,1 > 0,1,0），
+      保证即使其他工作流的 CSS 在 hud.css 之后加载，本层的"皮肤"仍然生效；
+      若他们有意覆盖布局/颜色，本层不抢（只加描边、刻度、发光、等宽数字）。
+   2) 不依赖具体 DOM 结构：只用类名 + 元素名，不用后代链硬绑，
+      因此 detail/home 等页面结构变动不会让本层失效。
+   3) 可读性优先：所有叠加纹理 alpha ≤ 0.05，正文对比度不下降；
+      动效幅度克制，且统一在 prefers-reduced-motion 下降级为静态。
+   ============================================================ */
+
+/* ---------------------------------------------------------- token 扩展 --- */
+/* 只新增变量名，不改 tokens.css 已有的名字 */
+:root {
+  --hud-line-soft: rgba(120, 200, 255, 0.1);
+  --hud-grid-size: 64px;
+  --hud-corner: 9px;
+  --hud-tick: 14px;
+  --hud-ring: rgba(95, 214, 255, 0.6);
+  --hud-ring-soft: rgba(95, 214, 255, 0.2);
+  --hud-panel-shadow: inset 0 0 0 1px var(--hud-inset), 0 0 22px rgba(80, 190, 255, 0.1);
+  --hud-sweep: linear-gradient(
+    102deg,
+    transparent 0%,
+    rgba(150, 225, 255, 0.06) 42%,
+    rgba(200, 242, 255, 0.16) 50%,
+    rgba(150, 225, 255, 0.06) 58%,
+    transparent 100%
+  );
+  /* 四角标记：8 段 1px 渐变拼出 L 形角标（配合 --hud-corner-sizes/-positions 使用） */
+  --hud-corner-marks: linear-gradient(var(--hud-line-strong), var(--hud-line-strong)),
+    linear-gradient(var(--hud-line-strong), var(--hud-line-strong)),
+    linear-gradient(var(--hud-line-strong), var(--hud-line-strong)),
+    linear-gradient(var(--hud-line-strong), var(--hud-line-strong)),
+    linear-gradient(var(--hud-line-strong), var(--hud-line-strong)),
+    linear-gradient(var(--hud-line-strong), var(--hud-line-strong)),
+    linear-gradient(var(--hud-line-strong), var(--hud-line-strong)),
+    linear-gradient(var(--hud-line-strong), var(--hud-line-strong));
+  --hud-corner-sizes: var(--hud-corner) 1px, 1px var(--hud-corner), var(--hud-corner) 1px, 1px var(--hud-corner),
+    var(--hud-corner) 1px, 1px var(--hud-corner), var(--hud-corner) 1px, 1px var(--hud-corner);
+  --hud-corner-positions: 0 0, 0 0, 100% 0, 100% 0, 0 100%, 0 100%, 100% 100%, 100% 100%;
+  --hud-motion-scale: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --hud-motion-scale: 0;
+  }
+}
+
+/* ------------------------------------------------- 全局仪器底纹（最底层） --- */
+/* 固定细网格 + 极缓慢漂移：让整站始终有"仪表台"质感。
+   使用 transform 漂移（合成层），避免逐帧重绘整屏背景。
+   z-index: 1 —— 位于全屏 canvas 之上、正文内容之下。 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: calc(var(--hud-grid-size) * -1);
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.55;
+  background-image: var(--hud-grid);
+  background-size: var(--hud-grid-size) var(--hud-grid-size);
+  will-change: transform;
+  animation: hudGridDrift 26s linear infinite;
+}
+
+@keyframes hudGridDrift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(var(--hud-grid-size), var(--hud-grid-size), 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   1. 可复用组合类
+   ============================================================ */
+
+/* 带四角标记的仪器面板 */
+.hud-panel {
+  position: relative;
+  background: var(--hud-bg);
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  box-shadow: var(--hud-panel-shadow);
+  color: var(--hud-text);
+}
+
+.hud-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--hud-corner-marks);
+  background-size: var(--hud-corner-sizes);
+  background-position: var(--hud-corner-positions);
+  background-repeat: no-repeat;
+}
+
+/* 面板内部的扫描线（alpha 极低，不影响文字对比度） */
+.hud-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: var(--hud-scanline);
+}
+
+/* 细分隔线：左亮右淡 + 末端指示点 */
+.hud-bar {
+  position: relative;
+  height: 1px;
+  border: 0;
+  margin: var(--hud-gap) 0;
+  background: linear-gradient(90deg, var(--hud-line-strong), var(--hud-line) 45%, transparent);
+}
+
+.hud-bar::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 3px;
+  height: 3px;
+  background: var(--hud-cyan);
+  box-shadow: var(--hud-glow);
+}
+
+/* 刻度尺：短刻度 + 每 5 格长刻度 */
+.hud-ticks {
+  height: 8px;
+  overflow: hidden;
+  background-image: repeating-linear-gradient(
+      90deg,
+      var(--hud-line-strong) 0 1px,
+      transparent 1px var(--hud-tick)
+    ),
+    repeating-linear-gradient(90deg, var(--hud-line-strong) 0 1px, transparent 1px calc(var(--hud-tick) * 5));
+  background-size: 100% 4px, 100% 8px;
+  background-position: 0 100%, 0 100%;
+  background-repeat: repeat-x;
+  opacity: 0.85;
+}
+
+/* 数值徽标 */
+.hud-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 7px;
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  background: var(--hud-inset);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  line-height: 1.6;
+  color: var(--hud-dim);
+  white-space: nowrap;
+}
+
+.hud-badge.is-on {
+  color: var(--hud-green);
+  border-color: rgba(111, 240, 184, 0.4);
+  box-shadow: 0 0 10px rgba(111, 240, 184, 0.18);
+}
+
+.hud-badge.is-warn {
+  color: var(--hud-amber);
+  border-color: rgba(255, 199, 107, 0.4);
+}
+
+/* 极轻的闪烁（状态指示）。reduced-motion 下完全静态 */
+.hud-flicker {
+  animation: hudFlicker 4.4s steps(1, end) infinite;
+}
+
+@keyframes hudFlicker {
+  0%,
+  86%,
+  100% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 0.72;
+  }
+  90% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 0.86;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-flicker {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* 等宽读数（数值 / 计数 / 进度） */
+.hud-readout {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: var(--hud-text);
+}
+
+/* 状态点 */
+.hud-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hud-cyan);
+  box-shadow: 0 0 8px var(--hud-cyan);
+}
+
+.hud-cap {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--hud-dim);
+}
+
+/* ---------------------------------------------------- 等宽数字（全局） --- */
+/* 所有数值 / 序号 / 进度 / 年份统一等宽对齐 */
+body .k-num,
+body .b-num,
+body .chapter-no,
+body .progress-count,
+body .t-year,
+body .era-span,
+body .hud-num,
+body .hud-badge,
+body [data-hud-num],
+body td,
+body th {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* -------------------------------------------------------- 焦点可见环 --- */
+/* 键盘可达性：统一高亮环，颜色取自 HUD 主色 */
+:focus-visible {
+  outline: 1px solid var(--hud-ring);
+  outline-offset: 2px;
+}
+
+/* 输入框原有 :focus 会清掉 box-shadow，这里用更高特异性补回键盘环 */
+body #global-search:focus-visible,
+body .home-search #home-search:focus-visible {
+  outline: 1px solid var(--hud-ring);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px var(--hud-ring-soft);
+}
+
+/* ============================================================
+   2. 既有组件叠加（不删原规则）
+   ============================================================ */
+
+/* ------------------------------------------------------------- 顶栏 --- */
+body .site-header {
+  position: relative;
+  box-shadow: inset 0 -1px 0 var(--hud-line-soft);
+}
+
+/* 顶栏底部一条发光基准线，像仪器面板的刻度基线 */
+body .site-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--hud-line-strong) 16%,
+    rgba(95, 214, 255, 0.55) 50%,
+    var(--hud-line-strong) 84%,
+    transparent 100%
+  );
+}
+
+body .brand {
+  text-shadow: 0 0 14px rgba(95, 214, 255, 0.22);
+}
+
+body .nav-link {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+body .nav-link.active {
+  text-shadow: 0 0 12px rgba(95, 214, 255, 0.35);
+}
+
+body .menu-btn {
+  border-color: var(--hud-line);
+  color: var(--hud-text);
+}
+
+body .menu-btn:hover {
+  border-color: var(--hud-line-strong);
+  box-shadow: 0 0 14px rgba(80, 190, 255, 0.18);
+}
+
+/* ------------------------------------------------------ 首页知识卡片 --- */
+body .k-card {
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--hud-panel-shadow);
+}
+
+/* 四角标记 */
+body .k-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--hud-corner-marks);
+  background-size: var(--hud-corner-sizes);
+  background-position: var(--hud-corner-positions);
+  background-repeat: no-repeat;
+  opacity: 0.9;
+}
+
+/* hover 扫描扫过 */
+body .k-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--hud-sweep);
+  transform: translateX(-130%);
+  transition: transform 0.72s var(--ease-out);
+}
+
+body .k-card:hover::before,
+body .k-card:focus-within::before {
+  transform: translateX(130%);
+}
+
+body .k-card:hover {
+  box-shadow: inset 0 0 0 1px var(--hud-inset), 0 0 26px rgba(80, 190, 255, 0.16);
+}
+
+body .k-num {
+  color: var(--hud-cyan);
+  text-shadow: var(--hud-glow);
+}
+
+body .k-cat {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+body .more-link {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+/* ------------------------------------------------------ 详情页面板 --- */
+body .film-panel {
+  box-shadow: var(--hud-panel-shadow);
+}
+
+/* 面板扫描线（opacity 0.5 × alpha 0.05 → 视觉影响可忽略）
+   z-index:-1 让它落在"面板背景之上、内容之下"：
+   .film-panel 自身 z-index:6 已是层叠上下文，负值子层不会跑到面板外面去，
+   也不会覆盖任何子元素的定位（避免影响其他工作流的绝对定位按钮）。 */
+body .film-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: var(--hud-scanline);
+}
+
+/* 面板四角标记 */
+body .film-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: var(--hud-corner-marks);
+  background-size: var(--hud-corner-sizes);
+  background-position: var(--hud-corner-positions);
+  background-repeat: no-repeat;
+}
+
+body .tabs {
+  border-bottom-color: var(--hud-line-soft);
+}
+
+body .tab {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+body .tab.active {
+  box-shadow: 0 0 14px rgba(80, 190, 255, 0.22);
+}
+
+body .scale-note {
+  border-left: 2px solid var(--hud-amber);
+  background-image: var(--hud-scanline);
+  color: #a9b6c9;
+}
+
+body .ctrl-btn {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+body .chapter-no {
+  color: var(--hud-cyan);
+  text-shadow: var(--hud-glow);
+}
+
+body .chapter-card h2 {
+  text-shadow: 0 0 26px rgba(95, 214, 255, 0.18);
+}
+
+body table {
+  border-top: 1px solid var(--hud-line-soft);
+}
+
+body td {
+  border-bottom: 1px solid var(--hud-line-soft);
+}
+
+body td:first-child {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--hud-dim);
+}
+
+/* 数值列（右列）保持高对比 */
+body td:last-child {
+  color: var(--hud-text);
+}
+
+/* -------------------------------------------------------- 进度条 --- */
+body .film-progress {
+  box-shadow: inset 0 1px 0 var(--hud-line-soft);
+}
+
+body .p-seg {
+  box-shadow: inset 0 0 0 1px rgba(120, 200, 255, 0.08);
+}
+
+body .p-seg.active {
+  box-shadow: 0 0 12px rgba(95, 214, 255, 0.55), inset 0 0 0 1px var(--hud-line-strong);
+}
+
+body .progress-count {
+  color: var(--hud-text);
+  letter-spacing: 0.16em;
+}
+
+body .progress-arrow {
+  border-color: var(--hud-line);
+}
+
+body .progress-arrow:hover {
+  border-color: var(--hud-line-strong);
+  box-shadow: 0 0 12px rgba(80, 190, 255, 0.2);
+}
+
+/* --------------------------------------------------------- 目录页 --- */
+body .chip {
+  position: relative;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  border-color: var(--hud-line);
+  box-shadow: inset 0 0 0 1px var(--hud-inset);
+}
+
+body .chip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--hud-sweep);
+  transform: translateX(-130%);
+  transition: transform 0.6s var(--ease-out);
+}
+
+body .chip:hover::after,
+body .chip:focus-visible::after {
+  transform: translateX(130%);
+}
+
+body .chip.active {
+  box-shadow: 0 0 14px rgba(122, 159, 208, 0.28), inset 0 0 0 1px var(--hud-line-strong);
+}
+
+body .browse-item a {
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--hud-inset);
+}
+
+/* 左侧 2px 状态条：hover / 聚焦时点亮 */
+body .browse-item a::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  pointer-events: none;
+  background: var(--hud-line);
+  transition: background 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
+}
+
+body .browse-item a:hover::after,
+body .browse-item a:focus-visible::after {
+  background: var(--hud-cyan);
+  box-shadow: 0 0 12px rgba(95, 214, 255, 0.5);
+}
+
+/* hover 扫描扫过 */
+body .browse-item a::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--hud-sweep);
+  transform: translateX(-130%);
+  transition: transform 0.7s var(--ease-out);
+}
+
+body .browse-item a:hover::before,
+body .browse-item a:focus-visible::before {
+  transform: translateX(130%);
+}
+
+body .browse-item a:hover {
+  box-shadow: inset 0 0 0 1px var(--hud-inset), 0 0 18px rgba(80, 190, 255, 0.12);
+}
+
+body .b-num {
+  color: var(--hud-cyan);
+  text-shadow: var(--hud-glow);
+}
+
+body .b-cat {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+body .b-go {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+/* --------------------------------------------------------- 抽屉 --- */
+body .drawer {
+  box-shadow: var(--hud-panel-shadow);
+}
+
+/* 抽屉扫描线：同样放在背景之上、内容之下（.drawer z-index:70 已是层叠上下文） */
+body .drawer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.45;
+  background-image: var(--hud-scanline);
+}
+
+body .drawer-head,
+body .drawer-links {
+  border-bottom-color: var(--hud-line-soft);
+}
+
+body .drawer-link:hover,
+body .drawer-sub-link:hover {
+  box-shadow: inset 2px 0 0 var(--hud-cyan);
+}
+
+body .drawer-group-title {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
+body .d-en {
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+/* --------------------------------------------------- 时间轴 / 通用 --- */
+body .era-head {
+  border-bottom-color: var(--hud-line-soft);
+}
+
+body .era-span,
+body .t-year {
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+}
+
+body .t-year {
+  color: var(--era-color, var(--hud-cyan));
+}
+
+body .t-event::before {
+  box-shadow: 0 0 10px rgba(95, 214, 255, 0.35);
+}
+
+/* 搜索建议 */
+body .suggest {
+  border-color: var(--hud-line);
+  box-shadow: var(--hud-panel-shadow);
+}
+
+body .suggest-item:hover {
+  box-shadow: inset 2px 0 0 var(--hud-cyan);
+}
+
+body .s-en {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+/* 按钮 */
+body .btn-primary,
+body .btn-ghost {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+}
+
+body .btn-primary {
+  box-shadow: 0 0 16px rgba(122, 159, 208, 0.3);
+}
+
+/* ============================================================
+   3. 降级与移动端
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* 所有扫描扫过 / 位移过渡全部关闭，仅保留静态描边 */
+  body .k-card::before,
+  body .chip::after,
+  body .browse-item a::before {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --hud-grid-size: 48px;
+    --hud-corner: 7px;
+  }
+
+  /* 375px 宽下不产生任何横向溢出 */
+  body .hud-ticks {
+    display: none;
+  }
+
+  body .nav-link,
+  body .chip {
+    letter-spacing: 0.04em;
+  }
+}
