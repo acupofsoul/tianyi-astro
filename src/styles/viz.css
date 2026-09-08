@@ -1,0 +1,375 @@
+/* ============================================================
+   数据可视化组件
+   所有者：工作流 A（数据可视化）
+   只在本文件中写属于该工作流的样式；不要修改其他 CSS 文件。
+   可用 token 见 src/styles/tokens.css（--hud-*、--mono、--ease-out …）
+   ============================================================ */
+
+.viz {
+  --viz-c: var(--hud-cyan);
+  --viz-label-w: 9em;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hud-gap);
+  max-width: 100%;
+  padding: 14px 14px 13px;
+  background: linear-gradient(180deg, rgba(8, 14, 24, 0.62), rgba(8, 14, 24, 0.32));
+  border: 1px solid var(--hud-line);
+  border-radius: var(--hud-radius);
+  color: var(--hud-text);
+  font-family: var(--mono);
+  overflow: hidden; /* 兜底：任何子元素都不产生横向滚动 */
+}
+
+/* 四角装饰（与 tokens.css 的 .hud-frame 同语言，但不依赖它） */
+.viz::before,
+.viz::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--hud-line-strong);
+  pointer-events: none;
+}
+.viz::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+.viz::after { right: -1px; bottom: -1px; border-left: 0; border-top: 0; }
+
+/* ---------------------------------------------------------------- 头部 */
+.viz-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.viz-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--hud-text);
+}
+.viz-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--hud-dim);
+}
+.viz-legend-mark {
+  display: inline-block;
+  width: 1px;
+  height: 10px;
+  background: var(--hud-amber);
+  box-shadow: 0 0 6px var(--hud-amber);
+}
+.viz-empty {
+  font-size: 11px;
+  color: var(--hud-dim);
+}
+
+/* -------------------------------------------------------------- 读数条 */
+.viz-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  min-height: 30px;
+  padding: 6px 9px;
+  background: var(--hud-inset);
+  border: 1px dashed var(--hud-line);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.viz-readout-name { color: var(--hud-dim); }
+.viz-readout-value {
+  color: var(--hud-cyan);
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--hud-glow);
+}
+.viz-readout-ratio {
+  margin-left: auto;
+  color: var(--hud-amber);
+  font-variant-numeric: tabular-nums;
+}
+.viz-readout-ratio.is-base { color: var(--hud-dim); }
+
+/* ---------------------------------------------------------------- 行 */
+.viz-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.viz-row {
+  padding: 5px 8px;
+  background: linear-gradient(90deg, rgba(120, 200, 255, 0.06), transparent 72%);
+  border: 1px solid transparent;
+  border-left: 2px solid var(--viz-c);
+  transition: background 0.18s var(--ease-out), border-color 0.18s var(--ease-out);
+}
+.viz-row:hover,
+.viz-row:focus-visible {
+  background: rgba(120, 200, 255, 0.12);
+  border-color: var(--hud-line-strong);
+  outline: none;
+}
+.viz-row:focus-visible { box-shadow: inset 0 0 0 1px var(--hud-cyan); }
+
+.viz-row-main {
+  display: grid;
+  grid-template-columns: var(--viz-label-w) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  min-width: 0;
+}
+.viz-row-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.viz-tag {
+  flex: none;
+  padding: 0 4px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--hud-amber);
+  border: 1px solid var(--hud-amber);
+}
+
+.viz-track {
+  position: relative;
+  height: 13px;
+  background-color: var(--hud-inset);
+  background-image: var(--hud-scanline);
+  border: 1px solid var(--hud-line);
+  overflow: hidden;
+}
+.viz-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--w, 0%);
+  background: var(--viz-c);
+  opacity: 0.82;
+  box-shadow: 0 0 10px var(--viz-c);
+}
+.viz-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--hud-text);
+  opacity: 0.75;
+}
+.viz-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--p, 0%);
+  width: 1px;
+  background: var(--hud-amber);
+  box-shadow: 0 0 8px var(--hud-amber);
+}
+
+.viz-row-val {
+  font-size: 11px;
+  color: var(--hud-cyan);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-align: right;
+}
+.viz-row-ratio {
+  min-width: 5.2em;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.viz-row-ratio.is-good { color: var(--hud-green); }
+.viz-row-ratio.is-low { color: var(--hud-amber); }
+.viz-row-ratio.is-neutral { color: var(--hud-cyan); text-shadow: var(--hud-glow); }
+
+.viz-row-note {
+  margin-top: 4px;
+  padding-left: calc(var(--viz-label-w) + 10px);
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--hud-dim);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- 仪表 */
+.viz-gauge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: var(--hud-gap);
+}
+.viz-gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 9px 11px;
+  background: var(--hud-inset);
+  border: 1px solid var(--hud-line);
+}
+.viz-gauge-label {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--hud-dim);
+  line-height: 1.4;
+}
+.viz-gauge-readout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+.viz-gauge-num {
+  font-size: 19px;
+  line-height: 1.15;
+  color: var(--hud-cyan);
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--hud-glow);
+}
+.viz-gauge-unit {
+  font-size: 10px;
+  color: var(--hud-dim);
+}
+.viz-gauge-track {
+  position: relative;
+  height: 8px;
+  margin: 4px 0 13px;
+  background-color: var(--hud-inset);
+  background-image: var(--hud-scanline);
+  border: 1px solid var(--hud-line);
+}
+.viz-gauge-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--w, 0%);
+  background: linear-gradient(90deg, rgba(95, 214, 255, 0.45), var(--hud-cyan));
+  box-shadow: 0 0 8px rgba(95, 214, 255, 0.5);
+}
+.viz-gauge-mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: var(--p, 0%);
+  width: 1px;
+  background: var(--hud-amber);
+  box-shadow: 0 0 8px var(--hud-amber);
+}
+.viz-gauge-marklabel {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: var(--p, 0%);
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 1;
+  color: var(--hud-amber);
+  white-space: nowrap;
+}
+.viz-gauge-note {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--hud-dim);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------ 对比矩阵 */
+.viz-compare-matrix .viz-row { border-left-color: var(--hud-amber); }
+.viz-compare-matrix .viz-bar {
+  background: linear-gradient(90deg, rgba(95, 214, 255, 0.55), var(--hud-cyan));
+  box-shadow: 0 0 10px rgba(95, 214, 255, 0.45);
+}
+
+/* -------------------------------------------------------------- 条形图 */
+.viz-chart-plot {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.viz-chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.viz-chart-gridline {
+  stroke: var(--hud-line);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+.viz-chart-axisline {
+  stroke: var(--hud-line-strong);
+  stroke-width: 1;
+}
+.viz-chart-axis {
+  fill: var(--hud-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.viz-chart-rect {
+  fill: var(--viz-c);
+  opacity: 0.82;
+  transform-box: fill-box;
+  transform-origin: bottom;
+  transform: scaleY(0);
+  transition: transform 0.7s var(--ease-out);
+}
+.viz-bar-chart.is-in .viz-chart-rect { transform: scaleY(1); }
+.viz-chart-col:focus-visible { outline: none; }
+.viz-chart-col:focus-visible .viz-chart-rect {
+  opacity: 1;
+  stroke: var(--hud-text);
+  stroke-width: 1.5;
+}
+.viz-chart-val {
+  fill: var(--hud-cyan);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.viz-chart-lab {
+  fill: var(--hud-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-chart-rect {
+    transition: none;
+    transform: scaleY(1);
+  }
+}
+
+/* -------------------------------------------------------------- 窄屏 */
+/* .viz-narrow 由 JS 按“组件自身容器宽度”添加（详情页侧栏约 340px，
+   视口媒体查询在桌面端不适用），阈值 480px。 */
+.viz.viz-narrow { --viz-label-w: 100%; padding: 12px 10px; }
+.viz-narrow .viz-row-main {
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: 6px;
+}
+.viz-narrow .viz-row-name { grid-column: 1; }
+.viz-narrow .viz-row-val { grid-column: 2; }
+.viz-narrow .viz-track { grid-column: 1 / -1; }
+.viz-narrow .viz-row-note { padding-left: 0; }
+.viz-narrow .viz-row-ratio { min-width: 4.2em; }
+.viz-narrow .viz-gauge-grid { grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); }
+.viz-narrow .viz-gauge-num { font-size: 17px; }
+.viz-narrow .viz-readout-ratio { margin-left: 0; }
