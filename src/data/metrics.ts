@@ -537,6 +537,111 @@ const entries: Record<string, EntryMetrics> = {
       { label: '中子星直径', unit: 'km', value: 20, ref: 1.3927e6, log: true, note: '≈ 太阳直径的 1.4×10⁻⁵' },
       { label: '蟹状星云直径', unit: 'km', value: 1.04e14, ref: 1.3927e6, log: true, note: '≈ 7.5×10⁷ 倍太阳直径' }
     ]
+  },
+
+  /* -------------------------------------------- 第三轮迭代新增展项指标 */
+
+  /* -------------------------------------------------------------- 木卫二 */
+  europa: {
+    refName: '地球',
+    scales: [
+      { id: 'earth-diameter', label: '地球直径', value: 12742, unit: 'km', note: '基准长度', color: '#5fd6ff' },
+      { id: 'europa-diameter', label: '木卫二直径', value: 3121.6, unit: 'km', note: '≈ 0.245 个地球直径', color: '#a9dcef' },
+      { id: 'moon-diameter', label: '月球直径', value: 3474.8, unit: 'km', note: '比木卫二略大', color: '#c9ccd4' },
+      { id: 'jupiter-diameter', label: '木星直径', value: 139820, unit: 'km', note: '≈ 11 个地球直径', color: '#e8b45a' },
+      { id: 'europa-orbit', label: '木卫二轨道半径', value: 671000, unit: 'km', note: '距木星中心', color: '#6ff0b8' }
+    ],
+    gauges: [
+      { label: '直径', value: 3121.6, unit: 'km', ref: 12742, refLabel: '地球', digits: 1, note: '≈ 0.245 个地球直径' },
+      { label: '公转周期', value: 3.55, unit: '天', digits: 2, note: '与自转同步（潮汐锁定）' },
+      { label: '表面温度', value: 102, unit: 'K', ref: 288, refLabel: '地球', digits: 0, note: '≈ -171 ℃' },
+      { label: '冰壳厚度', value: 20, unit: 'km', digits: 0, note: '约 15~25 km' },
+      { label: '地下海洋深度', value: 100, unit: 'km', digits: 0, note: '估计 60~150 km' },
+      { label: '反照率', value: 0.67, unit: '', min: 0, max: 1, digits: 2, note: '太阳系中表面最光滑的天体之一' }
+    ],
+    compare: [
+      { label: '直径', unit: 'km', value: 3121.6, ref: 12742, log: true, note: '约为地球直径的 24.5%' },
+      { label: '表面温度', unit: 'K', value: 102, ref: 288, log: true, note: '约为地球平均温度的 35%' },
+      { label: '轨道半径', unit: 'km', value: 671000, ref: 1.496e8, log: true, note: '约为日地距离的 0.45%' },
+      { label: '公转周期', unit: '天', value: 3.55, ref: 365.25, log: true, note: '约为地球一年的 1%' }
+    ]
+  },
+
+  /* -------------------------------------------------------------- 土卫六 */
+  titan: {
+    refName: '地球',
+    scales: [
+      { id: 'earth-diameter', label: '地球直径', value: 12742, unit: 'km', note: '基准长度', color: '#5fd6ff' },
+      { id: 'titan-diameter', label: '土卫六直径', value: 5149.5, unit: 'km', note: '比水星还大', color: '#e8a84a' },
+      { id: 'moon-diameter', label: '月球直径', value: 3474.8, unit: 'km', note: '约为土卫六的 0.67 倍', color: '#c9ccd4' },
+      { id: 'mercury-diameter', label: '水星直径', value: 4879, unit: 'km', note: '比土卫六略小', color: '#b5a99a' },
+      { id: 'titan-orbit', label: '土卫六轨道半径', value: 1221870, unit: 'km', note: '距土星中心', color: '#6ff0b8' }
+    ],
+    gauges: [
+      { label: '直径', value: 5149.5, unit: 'km', ref: 12742, refLabel: '地球', digits: 1, note: '约为地球直径的 40%' },
+      { label: '表面气压', value: 1.45, unit: 'bar', ref: 1.013, refLabel: '地球海平面', digits: 2, note: '比地球高约 45%' },
+      { label: '表面温度', value: 94, unit: 'K', ref: 288, refLabel: '地球', digits: 0, note: '≈ -179 ℃' },
+      { label: '大气含氮量', value: 94.2, unit: '%', min: 0, max: 100, digits: 1, note: '另有约 5.6% 甲烷' },
+      { label: '公转周期', value: 15.95, unit: '天', digits: 2, note: '与自转同步' },
+      { label: '大气层厚度', value: 600, unit: 'km', digits: 0, note: '约为地球大气的 7 倍' }
+    ],
+    compare: [
+      { label: '直径', unit: 'km', value: 5149.5, ref: 12742, log: true, note: '约为地球直径的 40%' },
+      { label: '表面气压', unit: 'bar', value: 1.45, ref: 1.013, log: true, note: '约为地球海平面气压的 1.43 倍' },
+      { label: '表面温度', unit: 'K', value: 94, ref: 288, log: true, note: '约为地球平均温度的 33%' },
+      { label: '轨道半径', unit: 'km', value: 1221870, ref: 1.496e8, log: true, note: '约为日地距离的 0.82%' }
+    ]
+  },
+
+  /* ---------------------------------------------------------- 蟹状星云 */
+  'crab-nebula': {
+    refName: '太阳',
+    scales: [
+      { id: 'neutron-star', label: '脉冲星直径', value: 20, unit: 'km', note: '典型中子星尺度', color: '#7e93a8' },
+      { id: 'sun-diameter', label: '太阳直径', value: 1.3927e6, unit: 'km', note: '≈ 109 个地球直径', color: '#ffc76b' },
+      { id: 'crab-diameter', label: '蟹状星云直径', value: 1.04e14, unit: 'km', note: '≈ 11 光年', color: '#ff7a9c' },
+      { id: 'light-year', label: '1 光年', value: 9.46e12, unit: 'km', note: '光走一年的距离', color: '#6ff0b8' },
+      { id: 'crab-distance', label: '蟹状星云距离', value: 6.15e16, unit: 'km', note: '≈ 6,500 光年', color: '#9a8cff' }
+    ],
+    gauges: [
+      { label: '直径', value: 1.04e14, unit: 'km', log: true, ref: 1.3927e6, refLabel: '太阳直径', digits: 2, note: '≈ 11 光年' },
+      { label: '脉冲周期', value: 0.033, unit: '秒', digits: 3, note: '每秒自转约 30 次' },
+      { label: '脉冲星直径', value: 20, unit: 'km', log: true, ref: 1.3927e6, refLabel: '太阳直径', digits: 1, note: '把太阳压到一座城市大小' },
+      { label: '膨胀速度', value: 1500, unit: 'km/s', ref: 617.7, refLabel: '太阳逃逸速度', digits: 0, note: '约为太阳逃逸速度的 2.4 倍' },
+      { label: '距离', value: 6.15e16, unit: 'km', log: true, ref: 1.496e8, refLabel: '1 AU', digits: 2, note: '≈ 6,500 光年' },
+      { label: '视星等', value: 8.4, unit: '等', digits: 1, note: '小型望远镜可见' }
+    ],
+    compare: [
+      { label: '直径', unit: 'km', value: 1.04e14, ref: 1.3927e6, log: true, note: '≈ 7.5×10⁷ 倍太阳直径' },
+      { label: '距离', unit: 'km', value: 6.15e16, ref: 1.496e8, log: true, note: '≈ 4.1×10⁸ 倍日地距离' },
+      { label: '膨胀速度', unit: 'km/s', value: 1500, ref: 617.7, log: true, note: '≈ 2.4 倍太阳表面逃逸速度' },
+      { label: '脉冲星直径', unit: 'km', value: 20, ref: 1.3927e6, log: true, note: '≈ 太阳直径的 1.4×10⁻⁵' }
+    ]
+  },
+
+  /* ------------------------------------------------------ 仙女座星系 */
+  andromeda: {
+    refName: '银河系',
+    scales: [
+      { id: 'milkyway-diameter', label: '银河系直径', value: 1.7e5, unit: '光年', note: '估计 10~18 万光年', color: '#9a8cff' },
+      { id: 'andromeda-diameter', label: '仙女座星系直径', value: 2.2e5, unit: '光年', note: '约 22 万光年', color: '#8fb8ff' },
+      { id: 'andromeda-distance', label: '仙女座星系距离', value: 2.537e6, unit: '光年', note: '约 254 万光年', color: '#6ff0b8' },
+      { id: 'earth-orbit', label: '日地距离', value: 1.496e8, unit: 'km', note: '= 1 AU', color: '#ffc76b' }
+    ],
+    gauges: [
+      { label: '直径', value: 2.2e5, unit: '光年', ref: 1.7e5, refLabel: '银河系', digits: 1, note: '比银河系大约 30%' },
+      { label: '距离', value: 2.537e6, unit: '光年', log: true, ref: 1, refLabel: '1 光年', digits: 2, note: '约 254 万光年' },
+      { label: '恒星数量', value: 1e12, unit: '颗', log: true, ref: 1e11, refLabel: '银河系量级', digits: 1, note: '约为银河系的 10 倍量级' },
+      { label: '视星等', value: 3.44, unit: '等', digits: 2, note: '肉眼可见的最遥远天体' },
+      { label: '中心黑洞质量', value: 1.4e8, unit: '太阳质量', log: true, ref: 4.3e6, refLabel: '人马座 A*', digits: 2, note: '约为银河系中心黑洞的 33 倍' },
+      { label: '接近速度', value: 110, unit: 'km/s', digits: 0, note: '预计 40~45 亿年后与银河系并合' }
+    ],
+    compare: [
+      { label: '直径', unit: '光年', value: 2.2e5, ref: 1.7e5, log: true, note: '约为银河系的 1.3 倍' },
+      { label: '距离', unit: '光年', value: 2.537e6, ref: 1, log: true, note: '≈ 254 万光年' },
+      { label: '中心黑洞质量', unit: '太阳质量', value: 1.4e8, ref: 4.3e6, log: true, note: '约为人马座 A* 的 33 倍' },
+      { label: '恒星数量', unit: '颗', value: 1e12, ref: 1e11, log: true, note: '约为银河系恒星数量的 10 倍量级' }
+    ]
   }
 }
 

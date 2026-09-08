@@ -83,7 +83,9 @@ export function getEnvironmentTexture(renderer: THREE.WebGLRenderer): THREE.Text
       scene.add(mesh)
     }
 
+    const t0 = performance.now()
     cached = pmrem.fromScene(scene, 0.04, 1, 60).texture
+    performance.measure('tianyi:env-ibl', { start: t0 })
 
     skyGeo.dispose()
     skyMat.dispose()

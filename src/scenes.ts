@@ -15,6 +15,7 @@ import {
   particleTexture
 } from './textures'
 import type { CatalogEntry, SceneKind } from './types'
+import { earthRoughnessTexture, rockyNormalTexture } from './textures/relief'
 import type { SceneLabelAnchor, SceneMeta, SceneOverlays, SceneScaleRef } from './scenes/types'
 import {
   disposeObject3D,
@@ -46,6 +47,12 @@ export interface SceneHandle {
   boundsRadius?: number
   /** 主体中心（世界坐标），默认 [0,0,0]。 */
   subjectCenter?: [number, number, number]
+  /**
+   * 建议曝光（ACES 影调映射的 toneMappingExposure 倍数）。
+   * 亮表面天体（月球、太阳）需要压暗，暗弱天体（星云、彗尾）需要提亮。
+   * 未设置时用 Viewer 的默认值。
+   */
+  exposure?: number
   /** 比例尺参考球。 */
   scaleRef?: SceneScaleRef
   /** 天体标签锚点。 */
@@ -96,24 +103,51 @@ export function makeStarfield(count = 1400): THREE.Points {
   const colors = new Float32Array(count * 3)
   const sizes = new Float32Array(count)
   const phases = new Float32Array(count)
-  const pal: [number, number, number][] = [
-    [255, 255, 255],
-    [190, 215, 255],
-    [255, 240, 200],
-    [150, 190, 255]
+  // 恒星颜色按光谱型抽样（黑体色近似），亮度按星等幂律分布：
+  // 绝大多数是暗星、极少数是亮星，夜空才有真实的层次感，
+  // 而不是一片亮度均匀的白点。约三成恒星聚集在银河带附近。
+  const SPECTRAL: { w: number; r: number; g: number; b: number }[] = [
+    { w: 0.03, r: 0.62, g: 0.74, b: 1.0 }, // B 型：蓝白
+    { w: 0.06, r: 0.8, g: 0.86, b: 1.0 }, // A 型：白
+    { w: 0.13, r: 0.96, g: 0.97, b: 1.0 }, // F 型：黄白
+    { w: 0.22, r: 1.0, g: 0.95, b: 0.84 }, // G 型：黄
+    { w: 0.25, r: 1.0, g: 0.82, b: 0.63 }, // K 型：橙
+    { w: 0.31, r: 1.0, g: 0.68, b: 0.52 } // M 型：红
   ]
+  const rng = mulberry32(20240915)
+  const dir = new THREE.Vector3()
+  const bandNormal = new THREE.Vector3(0.34, 0.82, -0.46).normalize()
   for (let i = 0; i < count; i++) {
-    const v = new THREE.Vector3().randomDirection().multiplyScalar(140 + Math.random() * 120)
-    positions[i * 3] = v.x
-    positions[i * 3 + 1] = v.y
-    positions[i * 3 + 2] = v.z
-    const c = pal[Math.floor(Math.random() * pal.length)]
-    const b = 0.55 + Math.random() * 0.45
-    colors[i * 3] = (c[0] / 255) * b
-    colors[i * 3 + 1] = (c[1] / 255) * b
-    colors[i * 3 + 2] = (c[2] / 255) * b
-    sizes[i] = 0.6 + Math.random() * 1.7
-    phases[i] = Math.random()
+    const inBand = rng() < 0.3
+    dir.randomDirection()
+    if (inBand) {
+      // 去掉沿银河带法线的分量 → 落到大圆上，再加一点厚度
+      dir.addScaledVector(bandNormal, -dir.dot(bandNormal))
+      if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0)
+      dir.normalize()
+      dir.addScaledVector(bandNormal, (rng() - 0.5) * 0.22).normalize()
+    }
+    const dist = 140 + rng() * 120
+    positions[i * 3] = dir.x * dist
+    positions[i * 3 + 1] = dir.y * dist
+    positions[i * 3 + 2] = dir.z * dist
+
+    let pick = rng()
+    let c = SPECTRAL[SPECTRAL.length - 1]
+    for (const s of SPECTRAL) {
+      pick -= s.w
+      if (pick <= 0) {
+        c = s
+        break
+      }
+    }
+    const mag = Math.pow(rng(), 2.6)
+    const b = 0.18 + mag * 0.95
+    colors[i * 3] = c.r * b
+    colors[i * 3 + 1] = c.g * b
+    colors[i * 3 + 2] = c.b * b
+    sizes[i] = 0.45 + Math.pow(rng(), 2.0) * 2.4
+    phases[i] = rng()
   }
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
@@ -324,7 +358,26 @@ export function buildPlanetScene(p: PlanetParams): SceneHandle {
       brightColor: p.brightColor
     })
   }
-  const mat = new THREE.MeshStandardMaterial({ map, roughness: 1, metalness: 0 })
+  // 岩石 / 地球：与反照率同源的法线贴图（频率与种子对齐），斜射光下有真实起伏；
+  // 地球另加粗糙度贴图，让海洋出现太阳镜面反射。
+  const solid = p.kind !== 'gas' && p.kind !== 'ice' && p.kind !== 'venus'
+  const normalMap = solid
+    ? rockyNormalTexture({
+        seed,
+        size: 256,
+        strength: p.kind === 'earth' ? 2.6 : 3.4,
+        craters: p.craters ?? 0,
+        frequency: 5
+      })
+    : null
+  const mat = new THREE.MeshStandardMaterial({
+    map,
+    roughness: p.kind === 'earth' ? 0.92 : solid ? 1 : 0.58,
+    metalness: 0,
+    normalMap: normalMap ?? undefined,
+    normalScale: normalMap ? new THREE.Vector2(1.25, 1.25) : undefined
+  })
+  if (p.kind === 'earth') mat.roughnessMap = earthRoughnessTexture(seed, 256)
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 64, 64), mat)
   markPick(mesh, p.name ?? '行星')
   if (p.gasSpot) {
@@ -519,7 +572,23 @@ export function buildSunScene(): SceneHandle {
 }
 export function buildMoonScene(): SceneHandle {
   const group = new THREE.Group()
-  const mat = new THREE.MeshStandardMaterial({ map: moonTexture(9), roughness: 1 })
+  // 月面法线贴图：与 moonTexture(9) 同种子、同频率、同陨石坑随机序列，
+  // 环形山的凹陷与颜色变暗落在同一处。
+  const mat = new THREE.MeshStandardMaterial({
+    map: moonTexture(9),
+    roughness: 1,
+    metalness: 0,
+    normalMap: rockyNormalTexture({
+      seed: 9,
+      size: 256,
+      strength: 4.2,
+      craters: 90,
+      frequency: 6,
+      craterSeed: 9 * 104729 + 7,
+      craterRadius: [0.015, 0.1]
+    }),
+    normalScale: new THREE.Vector2(1.35, 1.35)
+  })
   const moon = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 64), mat)
   // 让月球正面（经度约 0° 的一侧）初始朝向相机，便于看到并点击主要地貌。
   moon.rotation.y = -Math.PI / 2
@@ -563,6 +632,9 @@ export function buildMoonScene(): SceneHandle {
     maxDistance: 10,
     subjectRadius: 1,
     boundsRadius: 4,
+    // 月面反照率偏高（约 0.12 但相对星空极亮），按场景压曝光，
+    // 让向阳面保留灰阶层次而不是一片纯白
+    exposure: 0.55,
     labelAnchors: anchors,
     scaleRef: {
       radius: 1,
@@ -844,28 +916,72 @@ export function buildCometScene(): SceneHandle {
   }, 'comet')
 }
 
-export function buildNebulaScene(): SceneHandle {
+export interface NebulaCloud {
+  color: string
+  pos: [number, number, number]
+  scale: [number, number]
+  opacity: number
+  rot: number
+}
+
+export interface NebulaParams {
+  seed?: number
+  count?: number
+  /** 气体粒子配色（发射线近似色） */
+  palette?: [number, number, number][]
+  /** 三轴半径，用于改变星云整体形态 */
+  extent?: [number, number, number]
+  /** 弥散气体层（正常混合的柔和光斑） */
+  clouds?: NebulaCloud[]
+  coreColor?: string
+  hiiColor?: string
+  pointSize?: number
+  pointOpacity?: number
+  exposure?: number
+  subjectRadius?: number
+  boundsRadius?: number
+  camera?: [number, number, number]
+  scaleLabel?: string
+  anchors?: SceneLabelAnchor[]
+}
+
+const DEFAULT_NEBULA_PALETTE: [number, number, number][] = [
+  [255, 107, 157],
+  [123, 107, 255],
+  [62, 198, 255],
+  [255, 209, 102],
+  [255, 255, 255],
+  [200, 120, 255]
+]
+
+const DEFAULT_NEBULA_CLOUDS: NebulaCloud[] = [
+  { color: '#a82b52', pos: [0.2, 0.1, 0], scale: [13, 7.8], opacity: 0.55, rot: 0.18 },
+  { color: '#4a3a9e', pos: [1.9, 0.8, -1.0], scale: [9.5, 5.8], opacity: 0.45, rot: -0.42 },
+  { color: '#1f6e8c', pos: [-2.3, -0.7, 0.8], scale: [8.2, 4.9], opacity: 0.4, rot: 0.55 },
+  { color: '#8a5a1e', pos: [0.8, -1.2, 1.5], scale: [6, 3.6], opacity: 0.32, rot: -0.2 },
+  { color: '#6a3a9e', pos: [-1.4, 1.3, -1.6], scale: [6.8, 4], opacity: 0.36, rot: 0.9 }
+]
+
+export function buildNebulaScene(p: NebulaParams = {}): SceneHandle {
   const group = new THREE.Group()
-  const count = 2600
+  const count = p.count ?? 2600
   const positions = new Float32Array(count * 3)
   const colors = new Float32Array(count * 3)
-  const rng = mulberry32(777)
-  const pal: [number, number, number][] = [
-    [255, 107, 157],
-    [123, 107, 255],
-    [62, 198, 255],
-    [255, 209, 102],
-    [255, 255, 255],
-    [200, 120, 255]
-  ]
+  const rng = mulberry32(p.seed ?? 777)
+  const pal = p.palette ?? DEFAULT_NEBULA_PALETTE
+  const [extX, extY, extZ] = p.extent ?? [8, 4.5, 5.5]
   for (let i = 0; i < count; i++) {
-    const dir = new THREE.Vector3().randomDirection()
-    const r = Math.pow(rng(), 0.55) * 1
-    positions[i * 3] = dir.x * r * 8
-    positions[i * 3 + 1] = dir.y * r * 4.5
-    positions[i * 3 + 2] = dir.z * r * 5.5
+    // 方向由 rng 生成（而不是 Math.random），保证同一展项每次加载形态一致
+    const theta = rng() * Math.PI * 2
+    const z = rng() * 2 - 1
+    const s = Math.sqrt(1 - z * z)
+    const r = Math.pow(rng(), 0.55)
+    positions[i * 3] = Math.cos(theta) * s * r * extX
+    positions[i * 3 + 1] = z * r * extY
+    positions[i * 3 + 2] = Math.sin(theta) * s * r * extZ
     const c = pal[Math.floor(rng() * pal.length)]
-    const b = 0.35 + rng() * 0.65
+    // 亮度整体压低：加性混合下密集区域很容易被 ACES 压成纯白
+    const b = 0.2 + rng() * 0.45
     colors[i * 3] = (c[0] / 255) * b
     colors[i * 3 + 1] = (c[1] / 255) * b
     colors[i * 3 + 2] = (c[2] / 255) * b
@@ -876,22 +992,42 @@ export function buildNebulaScene(): SceneHandle {
   const points = new THREE.Points(
     geo,
     new THREE.PointsMaterial({
-      size: 0.42,
+      size: p.pointSize ?? 0.3,
       map: particleTexture(),
       vertexColors: true,
       transparent: true,
-      opacity: 0.92,
+      opacity: p.pointOpacity ?? 0.6,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
   )
   markPick(points, '星云气体')
   group.add(points)
-  const nebulaCore = makeGlowSprite('#a8c8ff', 7, 0.4)
-  const nebulaHii = makeGlowSprite('#ff9dd2', 4, 0.3)
+  const nebulaCore = makeGlowSprite(p.coreColor ?? '#a8c8ff', 7, 0.2)
+  const nebulaHii = makeGlowSprite(p.hiiColor ?? '#ff9dd2', 4, 0.16)
   markPick(nebulaCore, '星云核心')
   markPick(nebulaHii, '恒星形成区')
   group.add(nebulaCore, nebulaHii)
+
+  // 弥散气体层：几片大尺度柔和光斑，把「一堆点」变成有层次的云雾。
+  // 颜色对应真实发射线：Hα 红、O III 青、反射星云蓝紫。
+  const clouds = p.clouds ?? DEFAULT_NEBULA_CLOUDS
+  for (const c of clouds) {
+    const sprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: glowTexture(c.color),
+        transparent: true,
+        opacity: c.opacity,
+        // 正常混合而非加性：叠加只会在最亮处趋于上限，不会无限堆爆
+        blending: THREE.NormalBlending,
+        depthWrite: false
+      })
+    )
+    sprite.position.set(c.pos[0], c.pos[1], c.pos[2])
+    sprite.scale.set(c.scale[0], c.scale[1], 1)
+    sprite.material.rotation = c.rot
+    group.add(sprite)
+  }
   group.add(makeStarfield(900))
 
   return decorateScene({
@@ -900,58 +1036,99 @@ export function buildNebulaScene(): SceneHandle {
       group.rotation.y += dt * 0.018
       group.rotation.x += dt * 0.006
     },
-    camera: { position: [0, 1.7, 12.5] },
+    camera: { position: p.camera ?? [0, 1.7, 12.5] },
     autoRotate: true,
     autoRotateSpeed: 0.5,
     minDistance: 3,
     maxDistance: 30,
-    subjectRadius: 5,
-    boundsRadius: 14,
-    labelAnchors: [
+    subjectRadius: p.subjectRadius ?? 5,
+    boundsRadius: p.boundsRadius ?? 14,
+    labelAnchors: p.anchors ?? [
       { name: '星云核心', position: [0, 0, 0] },
       { name: '分子云', position: [3.2, 1.2, 2.0] }
     ],
     scaleRef: {
       radius: 1,
-      label: '参考球：1 世界单位（猎户座星云直径约 24 光年，形态为艺术化示意）',
+      label: p.scaleLabel ?? '参考球：1 世界单位（猎户座星云直径约 24 光年，形态为艺术化示意）',
       position: [0, -2.6, 0]
-    }
+    },
+    // 星云整体偏暗，且加性混合容易在核心堆积，略降曝光保住层次
+    exposure: p.exposure ?? 0.92
   }, 'nebula')
 }
 
-export function buildGalaxyScene(): SceneHandle {
+export interface GalaxyParams {
+  seed?: number
+  count?: number
+  /** 旋臂数量（银河系为 2 条主旋臂） */
+  arms?: number
+  /** 中央棒半长轴与厚度 */
+  bar?: { length: number; thickness: number }
+  /** 盘面半径缩放 */
+  radiusScale?: number
+  /** 旋臂缠绕紧密度 */
+  winding?: number
+  /** 旋臂配色（年轻蓝星 / 老年黄白星）；省略时用银河系的蓝白旋臂 */
+  armColors?: { young: [number, number, number]; old: [number, number, number] }
+  /** 核球亮度基数 */
+  coreBrightness?: number
+  coreColor?: string
+  coreGlow?: { scale: number; opacity: number }
+  /** 盘面倾角（弧度），用于呈现倾斜视角 */
+  tilt?: number
+  exposure?: number
+  subjectRadius?: number
+  boundsRadius?: number
+  scaleLabel?: string
+  anchors?: SceneLabelAnchor[]
+}
+
+export function buildGalaxyScene(p: GalaxyParams = {}): SceneHandle {
   const group = new THREE.Group()
-  const count = 9500
+  const count = p.count ?? 9500
+  const arms = p.arms ?? 2
+  const radiusScale = p.radiusScale ?? 1
+  const barLength = p.bar?.length ?? 2.6
+  const barThickness = p.bar?.thickness ?? 0.38
   const positions = new Float32Array(count * 3)
   const colors = new Float32Array(count * 3)
-  const rng = mulberry32(314)
+  const rng = mulberry32(p.seed ?? 314)
 
   for (let i = 0; i < count; i++) {
     // 中央棒结构：银河系是棒旋星系，核心为延展的棒
     if (i < count * 0.28) {
-      const bx = (rng() - 0.5) * 2.6
-      const by = (rng() - 0.5) * 0.38
-      const bz = (rng() - 0.5) * 0.38
+      const bx = (rng() - 0.5) * barLength
+      const by = (rng() - 0.5) * barThickness
+      const bz = (rng() - 0.5) * barThickness
       positions[i * 3] = bx
       positions[i * 3 + 1] = by
       positions[i * 3 + 2] = bz
-      const b = 0.65 + rng() * 0.35
+      // 核球粒子最密集，亮度压低才不会在加性混合下糊成一片纯白
+      const b = (p.coreBrightness ?? 0.3) + rng() * 0.3
       colors[i * 3] = 1 * b
       colors[i * 3 + 1] = 0.88 * b
       colors[i * 3 + 2] = 0.68 * b
       continue
     }
-    const arm = i % 2
+    const arm = i % arms
     const t = i / count
-    const r = 0.9 + 4.8 * Math.pow(t, 0.75)
-    const theta = r * 1.05 + arm * Math.PI + (rng() - 0.5) * 0.3
+    const r = (0.9 + 4.8 * Math.pow(t, 0.75)) * radiusScale
+    const theta = r * (p.winding ?? 1.05) + (arm / arms) * Math.PI * 2 + (rng() - 0.5) * 0.3
     const spread = 0.22 * (0.25 + r * 0.3)
     positions[i * 3] = Math.cos(theta) * r + (rng() - 0.5) * spread
     positions[i * 3 + 1] = (rng() - 0.5) * (0.16 + r * 0.12)
     positions[i * 3 + 2] = Math.sin(theta) * r + (rng() - 0.5) * spread
 
     const b = 0.5 + rng() * 0.5
-    if (r < 1.4) {
+    if (p.armColors) {
+      // 按年轻/老年星族比例混合（仙女座旋臂偏白，恒星形成活动较弱）
+      const w = rng()
+      const young = p.armColors.young
+      const old = p.armColors.old
+      colors[i * 3] = (old[0] + (young[0] - old[0]) * w) * b
+      colors[i * 3 + 1] = (old[1] + (young[1] - old[1]) * w) * b
+      colors[i * 3 + 2] = (old[2] + (young[2] - old[2]) * w) * b
+    } else if (r < 1.4) {
       colors[i * 3] = 1 * b
       colors[i * 3 + 1] = 0.9 * b
       colors[i * 3 + 2] = 0.72 * b
@@ -963,6 +1140,8 @@ export function buildGalaxyScene(): SceneHandle {
       colors[i * 3 + 2] = blue * b
     }
   }
+  // 倾斜视角：绕 x 轴倾斜盘面，配合自转得到斜看星系的效果
+  group.rotation.x = p.tilt ?? 0
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
@@ -980,7 +1159,12 @@ export function buildGalaxyScene(): SceneHandle {
   )
   markPick(points, '银河系盘面')
   group.add(points)
-  const galacticCore = makeGlowSprite('#ffe9b0', 3.2, 0.6)
+  // 银心：加性光斑叠在上万粒子上极易糊成白团，因此压到很低的强度
+  const galacticCore = makeGlowSprite(
+    p.coreColor ?? '#ffe9b0',
+    p.coreGlow?.scale ?? 2.6,
+    p.coreGlow?.opacity ?? 0.24
+  )
   markPick(galacticCore, '银心')
   group.add(galacticCore)
   group.add(makeStarfield(800))
@@ -995,18 +1179,20 @@ export function buildGalaxyScene(): SceneHandle {
     autoRotateSpeed: 0.6,
     minDistance: 3,
     maxDistance: 30,
-    subjectRadius: 5.7,
-    boundsRadius: 16,
-    labelAnchors: [
+    subjectRadius: p.subjectRadius ?? 5.7,
+    boundsRadius: p.boundsRadius ?? 16,
+    labelAnchors: p.anchors ?? [
       { name: '银心', position: [0, 0, 0] },
       { name: '旋臂', position: [4.2, 0, 0] },
       { name: '棒状核心', position: [1.4, 0, 0] }
     ],
     scaleRef: {
       radius: 1,
-      label: '参考球：1 世界单位（盘面半径约 5.7 单位；银河系直径约 10~18 万光年，非等比示意）',
+      label: p.scaleLabel ?? '参考球：1 世界单位（盘面半径约 5.7 单位；银河系直径约 10~18 万光年，非等比示意）',
       position: [0, -2.2, 0]
-    }
+    },
+    // 上万粒子叠加，核心最密处需要压曝光才不糊成白团
+    exposure: p.exposure ?? 0.82
   }, 'galaxy')
 }
 
@@ -1598,9 +1784,17 @@ export function buildSceneFor(entry: CatalogEntry): SceneHandle {
     case 'comet':
       return decorateScene(buildCometScene(), 'comet', metaForEntry(entry))
     case 'nebula':
-      return decorateScene(buildNebulaScene(), 'nebula', metaForEntry(entry))
+      return decorateScene(
+        buildNebulaScene((entry.sceneParams ?? {}) as unknown as NebulaParams),
+        'nebula',
+        metaForEntry(entry)
+      )
     case 'galaxy':
-      return decorateScene(buildGalaxyScene(), 'galaxy', metaForEntry(entry))
+      return decorateScene(
+        buildGalaxyScene((entry.sceneParams ?? {}) as unknown as GalaxyParams),
+        'galaxy',
+        metaForEntry(entry)
+      )
     case 'meteor':
       return decorateScene(buildMeteorScene(), 'meteor', metaForEntry(entry))
     case 'eclipse':

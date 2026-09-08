@@ -10,7 +10,7 @@
  * 陆地高粗糙度 → 保持漫反射。
  */
 import * as THREE from 'three'
-import { fbm, mulberry32 } from './textures'
+import { fbm, mulberry32 } from '../textures'
 
 const cache = new Map<string, THREE.Texture>()
 
@@ -31,44 +31,60 @@ export interface ReliefOpts {
   craters?: number
   /** fbm 基础频率，需与反照率贴图一致才能对齐。默认 5。 */
   frequency?: number
+  /** 陨石坑随机数种子基数，需与反照率贴图一致才能对齐。 */
+  craterSeed?: number
+  /** 陨石坑半径范围（uv 单位）。默认 [0.02, 0.08]。 */
+  craterRadius?: [number, number]
 }
 
 /** 由高度场生成法线贴图（中央差分 + 环绕采样，保证经度接缝连续）。 */
 export function rockyNormalTexture(opts: ReliefOpts): THREE.Texture {
   const size = opts.size ?? 256
-  const strength = opts.strength ?? 1.8
+  const strength = opts.strength ?? 3
   const frequency = opts.frequency ?? 5
   const craters = opts.craters ?? 0
+  const craterSeed = opts.craterSeed ?? opts.seed * 7919 + 13
+  const [crMin, crMax] = opts.craterRadius ?? [0.02, 0.08]
   const key = 'relief|' + opts.seed + '|' + size + '|' + strength + '|' + craters + '|' + frequency
   const hit = cache.get(key)
   if (hit) return hit
 
   const w = size
   const h = size >> 1
+  // 高度场 = 低频地貌（与反照率主色同源）+ 高频细节（与反照率的
+  // 「shade = fbm(u*14, v*14, seed+7)」项同源），这样凹凸与明暗严格对齐。
   const height = new Float32Array(w * h)
   for (let y = 0; y < h; y++) {
     const v = y / h
     for (let x = 0; x < w; x++) {
-      height[y * w + x] = fbm((x / w) * frequency, v * frequency, opts.seed, 5)
+      const low = fbm((x / w) * frequency, v * frequency, opts.seed, 5)
+      const high = fbm((x / w) * 14, v * 14, opts.seed + 7, 3)
+      height[y * w + x] = low * 0.68 + high * 0.32
     }
   }
 
   // 陨石坑：碗状凹陷 + 抬起的边缘，直接写进高度场
   if (craters > 0) {
-    const rng = mulberry32(opts.seed * 7919 + 13)
+    // 与反照率贴图完全相同的随机序列与半径定义（uv 空间），保证坑的凹陷
+    // 与颜色变暗落在同一位置；uv 半径在像素空间是椭圆，这里按 w/h 分别缩放。
+    const rng = mulberry32(craterSeed)
     for (let k = 0; k < craters; k++) {
-      const cx = rng() * w
-      const cy = rng() * h
-      const r = (0.02 + rng() * 0.07) * w
-      const depth = 0.35 + rng() * 0.5
-      const x0 = Math.max(0, Math.floor(cx - r))
-      const x1 = Math.min(w - 1, Math.ceil(cx + r))
-      const y0 = Math.max(0, Math.floor(cy - r))
-      const y1 = Math.min(h - 1, Math.ceil(cy + r))
+      // 必须与反照率贴图消耗完全相同的随机数序列（x, y, r 三次），
+      // 多调一次 rng() 就会让后续所有坑位错开；深度因此改为按序号推导。
+      const cu = rng()
+      const cv = rng()
+      const r = crMin + rng() * (crMax - crMin)
+      const depth = 0.55 + (k % 4) * 0.12
+      const rx = r * w
+      const ry = r * h
+      const x0 = Math.max(0, Math.floor(cu * w - rx))
+      const x1 = Math.min(w - 1, Math.ceil(cu * w + rx))
+      const y0 = Math.max(0, Math.floor(cv * h - ry))
+      const y1 = Math.min(h - 1, Math.ceil(cv * h + ry))
       for (let y = y0; y <= y1; y++) {
         for (let x = x0; x <= x1; x++) {
-          const dx = (x - cx) / r
-          const dy = (y - cy) / r
+          const dx = (x / w - cu) / r
+          const dy = (y / h - cv) / r
           const d = Math.sqrt(dx * dx + dy * dy)
           if (d > 1) continue
           // d<0.75 为碗底，0.75~1 为环形隆起

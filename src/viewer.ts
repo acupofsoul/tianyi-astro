@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import type { SceneHandle } from './scenes'
 import { updateLabelScales } from './scenes/props'
 import { PickHighlight } from './viewer/highlight'
+import { getEnvironmentTexture } from './viewer/environment'
 
 /** 视角预设（Phase 0 契约；工作流 B 可扩展字段，但不得改 id 语义）。 */
 export interface ViewPreset {
@@ -53,6 +54,8 @@ type Intro = {
   duration: number
 }
 
+/** 默认曝光：ACES 会压暗中间调，因此比 1 高一些。 */
+const DEFAULT_EXPOSURE = 1.42
 const MIN_TIME_SCALE = 0.1
 /** 上限与 UI 滑块末档（32×）对齐，避免「读数 32× 而实际被夹到 20×」的不一致。 */
 const MAX_TIME_SCALE = 32
@@ -115,6 +118,11 @@ export class Viewer {
       powerPreference: 'high-performance'
     })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+    // 物理化的色彩管线：ACES 影调映射把高光压回可视范围，
+    // 恒星、吸积盘、冰面不会再被硬截断成一片死白。
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = DEFAULT_EXPOSURE
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
     this.viewportHeight = Math.max(container.clientHeight || 1, 1)
     this.renderer.setSize(container.clientWidth || 1, this.viewportHeight)
     const canvas = this.renderer.domElement
@@ -149,8 +157,15 @@ export class Viewer {
       this.controls = null
     }
 
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55))
-    const dir = new THREE.DirectionalLight(0xffffff, 1.4)
+    // 环境光照（程序化 IBL）：给所有 PBR 材质提供方向性环境反射与柔和补光，
+    // 因此环境光可以调得很低，昼夜分界线才会清晰。
+    const env = getEnvironmentTexture(this.renderer)
+    if (env) {
+      this.scene.environment = env
+      this.scene.environmentIntensity = 0.72
+    }
+    this.scene.add(new THREE.AmbientLight(0xffffff, env ? 0.08 : 0.55))
+    const dir = new THREE.DirectionalLight(0xfff4e2, env ? 3.1 : 1.4)
     dir.position.set(6, 9, 7)
     this.scene.add(dir)
 
@@ -207,6 +222,8 @@ export class Viewer {
     }
     this.handle = handle
     this.scene.add(handle.group)
+    // 按场景测光：亮表面天体压暗、暗弱天体提亮
+    this.renderer.toneMappingExposure = handle.exposure ?? DEFAULT_EXPOSURE
     this.simTime = 0
     this.intro = null
     this.cameraTween = null
