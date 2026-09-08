@@ -36,6 +36,9 @@ function bindGlobalSearchKey(): void {
   })
 }
 
+/** 上一个实例注册的 document 点击监听卸载器（同一时刻只保留一个）。 */
+let detachDocClick: (() => void) | null = null
+
 function isVisible(input: HTMLInputElement): boolean {
   return input.getClientRects().length > 0 && input.offsetParent !== null
 }
@@ -275,11 +278,15 @@ export function mountSearch(container: HTMLElement, opts?: SearchOptions): void 
     }
   })
 
-  document.addEventListener('click', (event: MouseEvent) => {
+  // 路由切换会反复 mountSearch；先卸掉上一个实例的 document 监听，避免累积。
+  detachDocClick?.()
+  const onDocClick = (event: MouseEvent) => {
     if (!container.isConnected) return
     if (event.target instanceof Node && container.contains(event.target)) return
     closeSuggest()
-  })
+  }
+  document.addEventListener('click', onDocClick)
+  detachDocClick = () => document.removeEventListener('click', onDocClick)
 
   input.value = opts?.query ?? ''
   query = input.value
