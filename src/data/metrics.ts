@@ -642,6 +642,81 @@ const entries: Record<string, EntryMetrics> = {
       { label: '中心黑洞质量', unit: '太阳质量', value: 1.4e8, ref: 4.3e6, log: true, note: '约为人马座 A* 的 33 倍' },
       { label: '恒星数量', unit: '颗', value: 1e12, ref: 1e11, log: true, note: '约为银河系恒星数量的 10 倍量级' }
     ]
+  },
+
+  /* ------------------------------------------------------------ 脉冲星 */
+  pulsar: {
+    refName: '太阳',
+    scales: [
+      { id: 'neutron-star', label: '中子星直径', value: 20, unit: 'km', note: '典型值约 20 km', color: '#8fd0ff' },
+      { id: 'earth-diameter', label: '地球直径', value: 12742, unit: 'km', note: '基准长度', color: '#5fd6ff' },
+      { id: 'sun-diameter', label: '太阳直径', value: 1.3927e6, unit: 'km', note: '≈ 109 个地球直径', color: '#ffc76b' },
+      { id: 'light-second', label: '1 光秒', value: 299792, unit: 'km', note: '光走一秒的距离', color: '#6ff0b8' }
+    ],
+    gauges: [
+      { label: '直径', value: 20, unit: 'km', log: true, ref: 1.3927e6, refLabel: '太阳直径', digits: 1, note: '约为太阳直径的 1.4×10⁻⁵' },
+      { label: '典型质量', value: 1.4, unit: '太阳质量', ref: 1, refLabel: '太阳', digits: 2, note: '超过钱德拉塞卡极限' },
+      { label: '平均密度', value: 1e17, unit: 'kg/m³', log: true, ref: 5514, refLabel: '地球', digits: 1, note: '相当于原子核密度' },
+      { label: '自转周期（蟹状星云脉冲星）', value: 0.033, unit: '秒', digits: 3, note: '每秒自转约 30 次' },
+      { label: '表面磁场', value: 1e11, unit: '特斯拉', log: true, ref: 5e-5, refLabel: '地球磁场', digits: 1, note: '地球磁场约 5×10⁻⁵ T' },
+      { label: '逃逸速度', value: 0.6, unit: '倍光速', min: 0, max: 1, digits: 2, note: '约 1.8×10⁵ km/s' }
+    ],
+    compare: [
+      { label: '直径', unit: 'km', value: 20, ref: 1.3927e6, log: true, note: '约为太阳直径的 1.4×10⁻⁵' },
+      { label: '平均密度', unit: 'kg/m³', value: 1e17, ref: 5514, log: true, note: '约为地球平均密度的 1.8×10¹³ 倍' },
+      { label: '表面磁场', unit: '特斯拉', value: 1e11, ref: 5e-5, log: true, note: '约为地球磁场的 2×10¹⁵ 倍' },
+      { label: '自转周期', unit: '秒', value: 0.033, ref: 86400, log: true, note: '地球自转一周需 86,400 秒' }
+    ]
+  },
+
+  /* -------------------------------------------------------- 小行星带 */
+  'asteroid-belt': {
+    refName: '地球',
+    scales: [
+      { id: 'earth-orbit', label: '地球轨道半径', value: 1.496e8, unit: 'km', note: '= 1 AU', color: '#5fd6ff' },
+      { id: 'belt-inner', label: '小行星带内缘', value: 3.29e8, unit: 'km', note: '≈ 2.2 AU', color: '#a89e8c' },
+      { id: 'belt-outer', label: '小行星带外缘', value: 4.79e8, unit: 'km', note: '≈ 3.2 AU', color: '#c0b6a2' },
+      { id: 'jupiter-orbit', label: '木星轨道半径', value: 7.785e8, unit: 'km', note: '≈ 5.2 AU', color: '#e8b45a' },
+      { id: 'ceres-diameter', label: '谷神星直径', value: 940, unit: 'km', note: '带内最大天体', color: '#8e8878' }
+    ],
+    gauges: [
+      { label: '带内天体数', value: 1.3e6, unit: '颗', log: true, ref: 1, refLabel: '直径 > 1 km', digits: 1, note: '仅统计直径大于 1 km 者' },
+      { label: '总质量占月球比例', value: 4, unit: '%', min: 0, max: 100, digits: 1, note: '整个带的质量仍远小于月球' },
+      { label: '谷神星直径', value: 940, unit: 'km', ref: 3474.8, refLabel: '月球', digits: 0, note: '约为月球直径的 27%' },
+      { label: '平均间距', value: 1e6, unit: 'km', log: true, ref: 384400, refLabel: '地月距离', digits: 1, note: '约为地月距离的 2.6 倍' },
+      { label: '公转周期', value: 4.6, unit: '年', ref: 1, refLabel: '地球', digits: 1, note: '带内典型值约 3~6 年' }
+    ],
+    compare: [
+      { label: '轨道半径（内缘）', unit: 'km', value: 3.29e8, ref: 1.496e8, log: true, note: '约为地球轨道半径的 2.2 倍' },
+      { label: '谷神星直径', unit: 'km', value: 940, ref: 3474.8, log: true, note: '约为月球直径的 27%' },
+      { label: '平均间距', unit: 'km', value: 1e6, ref: 384400, log: true, note: '约为地月距离的 2.6 倍' },
+      { label: '公转周期', unit: '年', value: 4.6, ref: 1, log: true, note: '约为地球公转周期的 4.6 倍' }
+    ]
+  },
+
+  /* -------------------------------------------------- 系外行星系统 */
+  'trappist-1': {
+    refName: '太阳系',
+    scales: [
+      { id: 'earth-radius', label: '地球半径', value: 6371, unit: 'km', note: '基准长度', color: '#5fd6ff' },
+      { id: 'planet-b', label: 'TRAPPIST-1b 半径', value: 7135, unit: 'km', note: '≈ 1.12 地球半径', color: '#d8663c' },
+      { id: 'mercury-orbit', label: '水星轨道半径', value: 5.79e7, unit: 'km', note: '太阳系最内侧行星', color: '#b5a99a' },
+      { id: 'sun-radius', label: '太阳半径', value: 6.96e5, unit: 'km', note: '红矮星仅为其 12%', color: '#ffc76b' }
+    ],
+    gauges: [
+      { label: '距离', value: 40, unit: '光年', digits: 0, note: '约 3.8×10¹⁴ km' },
+      { label: '恒星半径占太阳', value: 12, unit: '%', min: 0, max: 100, digits: 1, note: 'M8V 型红矮星' },
+      { label: '行星数量', value: 7, unit: '颗', min: 0, max: 10, digits: 0, note: '已知行星数量最多的系统之一' },
+      { label: '最短公转周期', value: 1.51, unit: '天', ref: 88, refLabel: '水星', digits: 2, note: 'TRAPPIST-1b' },
+      { label: '最长公转周期', value: 18.77, unit: '天', ref: 88, refLabel: '水星', digits: 2, note: 'TRAPPIST-1h' },
+      { label: '系统年龄', value: 7.6e9, unit: '年', log: true, ref: 4.6e9, refLabel: '太阳系', digits: 1, note: '约 76 亿年' }
+    ],
+    compare: [
+      { label: '恒星半径', unit: 'km', value: 8.35e4, ref: 6.96e5, log: true, note: '约为太阳半径的 12%' },
+      { label: '行星轨道半径', unit: 'km', value: 1.7e6, ref: 5.79e7, log: true, note: '最内侧行星轨道约为水星轨道的 3%' },
+      { label: '公转周期', unit: '天', value: 1.51, ref: 88, log: true, note: '约为水星公转周期的 1.7%' },
+      { label: '系统年龄', unit: '年', value: 7.6e9, ref: 4.6e9, log: true, note: '约为太阳系年龄的 1.65 倍' }
+    ]
   }
 }
 

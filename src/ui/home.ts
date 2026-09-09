@@ -23,7 +23,10 @@ const sceneLabels: Record<SceneKind, string> = {
   meteor: '流星',
   eclipse: '日食',
   aurora: '极光',
-  supernova: '超新星'
+  supernova: '超新星',
+  pulsar: '脉冲星',
+  asteroid: '小行星带',
+  exoplanet: '系外行星系'
 }
 
 export function renderHome(root: HTMLElement) {

@@ -11,6 +11,9 @@ export type SceneKind =
   | 'eclipse'
   | 'aurora'
   | 'supernova'
+  | 'pulsar'
+  | 'asteroid'
+  | 'exoplanet'
 
 export type Category =
   | '太阳系'

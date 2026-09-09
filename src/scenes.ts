@@ -1610,6 +1610,345 @@ export function buildSupernovaScene(): SceneHandle {
   }, 'supernova')
 }
 
+// ---------------------------------------------------------------- 脉冲星 --
+/**
+ * 脉冲星：快速自转、高度磁化的中子星。
+ * 视觉要点：磁轴与自转轴不重合（约 28°），射束沿磁轴射出，
+ * 自转时扫过视线方向 → 观测到周期性脉冲（灯塔效应）。
+ */
+export function buildPulsarScene(): SceneHandle {
+  const group = new THREE.Group()
+  group.add(makeStarfield(1500))
+
+  const spin = new THREE.Group()
+  const magnetic = new THREE.Group()
+  magnetic.rotation.z = THREE.MathUtils.degToRad(28)
+  spin.add(magnetic)
+  group.add(spin)
+
+  // 中子星：直径约 20 km，却有 1.4 倍太阳质量
+  const starMat = new THREE.MeshBasicMaterial({ color: 0xdfefff })
+  const star = new THREE.Mesh(new THREE.SphereGeometry(0.22, 32, 32), starMat)
+  markPick(star, '中子星')
+  magnetic.add(star)
+  const starGlow = makeGlowSprite('#cfe8ff', 1.5, 0.5)
+  markPick(starGlow, '中子星辐射')
+  magnetic.add(starGlow)
+
+  // 磁轴（虚线）
+  const axis = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -2.1, 0), new THREE.Vector3(0, 2.1, 0)]),
+    new THREE.LineDashedMaterial({
+      color: 0x8fd0ff,
+      dashSize: 0.1,
+      gapSize: 0.08,
+      transparent: true,
+      opacity: 0.55
+    })
+  )
+  axis.computeLineDistances()
+  markPick(axis, '磁轴')
+  magnetic.add(axis)
+
+  // 双极射束
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0x8fe0ff,
+    transparent: true,
+    opacity: 0.16,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  })
+  for (const sign of [1, -1]) {
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(0.62, 3.4, 36, 1, true), beamMat)
+    beam.position.y = sign * 1.7
+    if (sign < 0) beam.rotation.z = Math.PI
+    markPick(beam, sign > 0 ? '北极射束' : '南极射束')
+    magnetic.add(beam)
+  }
+
+  // 磁力线：偶极场 r = r₀·sin²θ 的示意
+  const fieldMat = new THREE.LineBasicMaterial({ color: 0x5fb8ff, transparent: true, opacity: 0.2 })
+  for (let i = 0; i < 10; i++) {
+    const lon = (i / 10) * Math.PI * 2
+    const pts: THREE.Vector3[] = []
+    for (let k = 0; k <= 28; k++) {
+      const theta = 0.14 + (k / 28) * (Math.PI - 0.28)
+      const r = 0.5 + 1.7 * Math.sin(theta) * Math.sin(theta)
+      pts.push(
+        new THREE.Vector3(
+          Math.sin(theta) * Math.cos(lon) * r,
+          Math.cos(theta) * r,
+          Math.sin(theta) * Math.sin(lon) * r
+        )
+      )
+    }
+    magnetic.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), fieldMat))
+  }
+
+  // 自转轴（世界竖直，不随自转旋转）
+  group.add(
+    new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -2.4, 0), new THREE.Vector3(0, 2.4, 0)]),
+      new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16 })
+    )
+  )
+
+  const bright = new THREE.Color(0xdfefff)
+  const dim = new THREE.Color(0x5c7a97)
+  const spinSpeed = 2.2
+
+  return decorateScene(
+    {
+      group,
+      update: (t, dt) => {
+        spin.rotation.y += dt * spinSpeed
+        // 真实脉冲周期 1.4 ms ~ 8.5 s，这里放慢到肉眼可读；
+        // 指数让脉冲尖锐（射束扫过视线时才亮）
+        const phase = (t * spinSpeed) % (Math.PI * 2)
+        const pulse = Math.pow(Math.abs(Math.cos(phase * 0.5)), 8)
+        starMat.color.copy(dim).lerp(bright, 0.3 + 0.7 * pulse)
+        beamMat.opacity = 0.07 + 0.34 * pulse
+        starGlow.material.opacity = 0.24 + 0.5 * pulse
+      },
+      camera: { position: [3.4, 2.6, 4.6] },
+      minDistance: 1.4,
+      maxDistance: 16,
+      subjectRadius: 1.2,
+      boundsRadius: 5,
+      labelAnchors: [
+        { name: '中子星', position: [0, 0, 0] },
+        { name: '磁轴', position: [0.9, 1.9, 0] },
+        { name: '射束', position: [1.1, 3.1, 0] },
+        { name: '自转轴', position: [0, 2.5, 0] }
+      ],
+      scaleRef: {
+        radius: 0.22,
+        label: '参考球：中子星直径约 20 km（1.4 倍太阳质量压缩到一座城市大小）',
+        position: [2.2, -1.6, 0]
+      }
+    },
+    'pulsar'
+  )
+}
+
+// -------------------------------------------------------------- 小行星带 --
+/**
+ * 小行星带：太阳 + 2.2~3.2 AU 之间的数百颗岩块 + 矮行星谷神星。
+ * 用 InstancedMesh 一次性绘制全部小行星（1 个 draw call）。
+ */
+export function buildAsteroidScene(): SceneHandle {
+  const group = new THREE.Group()
+  group.add(makeStarfield(1200))
+
+  const sun = new THREE.Mesh(
+    new THREE.SphereGeometry(0.42, 32, 32),
+    new THREE.MeshBasicMaterial({ color: 0xffd27a })
+  )
+  markPick(sun, '太阳')
+  group.add(sun)
+  group.add(makeGlowSprite('#ffc46b', 2.2, 0.5))
+
+  // 轨道参考环（内缘 2.2 AU / 外缘 3.2 AU）
+  const scale = 1.35 // 世界单位 / AU
+  for (const au of [2.2, 3.2]) {
+    const pts: THREE.Vector3[] = []
+    for (let i = 0; i <= 180; i++) {
+      const a = (i / 180) * Math.PI * 2
+      pts.push(new THREE.Vector3(Math.cos(a) * au * scale, 0, Math.sin(a) * au * scale))
+    }
+    group.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints(pts),
+        new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 })
+      )
+    )
+  }
+
+  // 小行星：不规则多面体 + 顶点扰动（共享几何体，只扰动一次）
+  const COUNT = 560
+  const geo = new THREE.IcosahedronGeometry(1, 0)
+  const posAttr = geo.attributes.position as THREE.BufferAttribute
+  const jitter = mulberry32(2200)
+  for (let i = 0; i < posAttr.count; i++) {
+    const j = 0.72 + jitter() * 0.56
+    posAttr.setXYZ(i, posAttr.getX(i) * j, posAttr.getY(i) * j, posAttr.getZ(i) * j)
+  }
+  geo.computeVertexNormals()
+  const inst = new THREE.InstancedMesh(
+    geo,
+    new THREE.MeshStandardMaterial({ color: 0x8a8073, roughness: 1, metalness: 0 }),
+    COUNT
+  )
+  markPick(inst, '小行星')
+  group.add(inst)
+
+  const rng = mulberry32(20240)
+  const rocks = Array.from({ length: COUNT }, () => ({
+    au: 2.2 + rng() * 1.0,
+    angle: rng() * Math.PI * 2,
+    incl: (rng() - 0.5) * 0.22,
+    size: 0.014 + Math.pow(rng(), 2.6) * 0.08,
+    spin: (rng() - 0.5) * 1.8,
+    phase: rng() * Math.PI * 2
+  }))
+
+  // 谷神星：小行星带中最大的天体，直径约 940 km
+  const ceres = new THREE.Mesh(
+    new THREE.SphereGeometry(0.13, 32, 32),
+    new THREE.MeshStandardMaterial({
+      map: rockyTexture(77, { land: ['#8e8878', '#a89e8c', '#6f6a5c', '#c0b6a2'], craters: 14 }),
+      roughness: 1,
+      metalness: 0
+    })
+  )
+  markPick(ceres, '谷神星')
+  group.add(ceres)
+
+  const dummy = new THREE.Object3D()
+  const ceresAu = 2.77
+
+  return decorateScene(
+    {
+      group,
+      update: (t, dt) => {
+        for (let i = 0; i < COUNT; i++) {
+          const rock = rocks[i]
+          // 开普勒第三定律：周期 ∝ a^1.5
+          const theta = rock.angle + (t * 0.55) / Math.pow(rock.au, 1.5)
+          const dist = rock.au * scale
+          dummy.position.set(
+            Math.cos(theta) * dist,
+            Math.sin(rock.incl) * dist * 0.1,
+            Math.sin(theta) * dist
+          )
+          dummy.rotation.set(rock.phase + t * rock.spin * 0.4, rock.phase * 1.7 + t * rock.spin * 0.3, rock.phase * 0.6)
+          dummy.scale.setScalar(rock.size)
+          dummy.updateMatrix()
+          inst.setMatrixAt(i, dummy.matrix)
+        }
+        inst.instanceMatrix.needsUpdate = true
+
+        const cTheta = (t * 0.55) / Math.pow(ceresAu, 1.5)
+        ceres.position.set(
+          Math.cos(cTheta) * ceresAu * scale,
+          0,
+          Math.sin(cTheta) * ceresAu * scale
+        )
+        ceres.rotation.y += dt * 0.25
+      },
+      camera: { position: [0, 6.2, 10.5] },
+      autoRotate: true,
+      autoRotateSpeed: 0.25,
+      minDistance: 3,
+      maxDistance: 34,
+      subjectRadius: 5.2,
+      boundsRadius: 14,
+      labelAnchors: [
+        { name: '太阳', position: [0, 0.9, 0] },
+        { name: '谷神星', position: [ceresAu * scale, 0.5, 0] },
+        { name: '小行星带', position: [0, 1.2, 4.4] }
+      ],
+      scaleRef: {
+        radius: 0.42,
+        label: '参考球：太阳半径示意（小行星直径与间距非真实比例，真实平均间距约 100 万千米）',
+        position: [0, -2.2, 0]
+      }
+    },
+    'asteroid'
+  )
+}
+
+// ---------------------------------------------------------- 系外行星系统 --
+/**
+ * 系外行星系：以 TRAPPIST-1 为原型 —— 一颗 M8V 红矮星 + 七颗地球大小的行星，
+ * 轨道半径都小于水星轨道，行星被潮汐锁定（永远同一面朝向恒星）。
+ */
+export function buildExoplanetScene(): SceneHandle {
+  const group = new THREE.Group()
+  group.add(makeStarfield(1500))
+
+  // TRAPPIST-1：半径约为太阳的 0.12 倍，表面温度约 2560 K
+  const star = new THREE.Mesh(
+    new THREE.SphereGeometry(0.3, 32, 32),
+    new THREE.MeshBasicMaterial({ color: 0xff6b3a })
+  )
+  markPick(star, 'TRAPPIST-1')
+  group.add(star)
+  group.add(makeGlowSprite('#ff7a45', 2.1, 0.5))
+
+  // 红矮星是低质量恒星，行星必须靠得很近才可能有液态水
+  const light = new THREE.PointLight(0xff9a5c, 9, 26, 2)
+  group.add(light)
+
+  const PLANETS: { name: string; r: number; dist: number; color: string; period: number }[] = [
+    { name: 'TRAPPIST-1b', r: 1.12, dist: 1.15, color: '#d8663c', period: 1.51 },
+    { name: 'TRAPPIST-1c', r: 1.1, dist: 1.5, color: '#c98a5a', period: 2.42 },
+    { name: 'TRAPPIST-1d', r: 0.79, dist: 1.95, color: '#8fb4c8', period: 4.05 },
+    { name: 'TRAPPIST-1e', r: 0.92, dist: 2.5, color: '#4f8fb8', period: 6.1 },
+    { name: 'TRAPPIST-1f', r: 1.05, dist: 3.15, color: '#5aa6b8', period: 9.21 },
+    { name: 'TRAPPIST-1g', r: 1.15, dist: 3.9, color: '#7f9ec4', period: 12.35 },
+    { name: 'TRAPPIST-1h', r: 0.77, dist: 4.8, color: '#b8c8d8', period: 18.77 }
+  ]
+  const R = 0.24 // 1 地球半径 → 世界单位
+
+  const bodies = PLANETS.map((p) => {
+    const mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(p.r * R, 32, 32),
+      new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.85, metalness: 0 })
+    )
+    markPick(mesh, p.name)
+    group.add(mesh)
+
+    // 轨道线
+    const pts: THREE.Vector3[] = []
+    const d = p.dist
+    for (let i = 0; i <= 128; i++) {
+      const a = (i / 128) * Math.PI * 2
+      pts.push(new THREE.Vector3(Math.cos(a) * d, 0, Math.sin(a) * d))
+    }
+    const orbit = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: p.color, transparent: true, opacity: 0.18 })
+    )
+    orbit.name = 'overlay-orbits'
+    group.add(orbit)
+    return { def: p, mesh, orbit }
+  })
+
+  return decorateScene(
+    {
+      group,
+      update: (t) => {
+        for (const b of bodies) {
+          // 周期按真实值比例缩放（这里以 b 的 1.51 天为基准放大成可读节奏）
+          const theta = (t * 0.5 * (1.51 / b.def.period)) % (Math.PI * 2)
+          const d = b.def.dist
+          b.mesh.position.set(Math.cos(theta) * d, 0, Math.sin(theta) * d)
+          // 潮汐锁定：始终同一面朝向恒星
+          b.mesh.lookAt(0, 0, 0)
+        }
+      },
+      camera: { position: [0, 4.2, 8.6] },
+      minDistance: 2,
+      maxDistance: 24,
+      subjectRadius: 3.4,
+      boundsRadius: 11,
+      labelAnchors: [
+        { name: 'TRAPPIST-1', position: [0, 0.7, 0] },
+        { name: 'e（宜居带）', position: [2.5, 0.45, 0] },
+        { name: 'h（最外侧）', position: [4.8, 0.45, 0] }
+      ],
+      scaleRef: {
+        radius: 0.3,
+        label: '参考球：红矮星半径约为太阳的 0.12 倍；行星大小按地球半径等比，轨道间距已压缩',
+        position: [0, -1.8, 0]
+      }
+    },
+    'exoplanet'
+  )
+}
+
 export function buildSolarSystemScene(): SceneHandle {
   const group = new THREE.Group()
   const rng = mulberry32(1234)
@@ -1803,6 +2142,12 @@ export function buildSceneFor(entry: CatalogEntry): SceneHandle {
       return decorateScene(buildAuroraScene(), 'aurora', metaForEntry(entry))
     case 'supernova':
       return decorateScene(buildSupernovaScene(), 'supernova', metaForEntry(entry))
+    case 'pulsar':
+      return decorateScene(buildPulsarScene(), 'pulsar', metaForEntry(entry))
+    case 'asteroid':
+      return decorateScene(buildAsteroidScene(), 'asteroid', metaForEntry(entry))
+    case 'exoplanet':
+      return decorateScene(buildExoplanetScene(), 'exoplanet', metaForEntry(entry))
     default:
       throw new Error('unknown scene: ' + entry.scene)
   }

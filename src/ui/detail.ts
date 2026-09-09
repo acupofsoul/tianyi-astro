@@ -33,7 +33,10 @@ const sceneNotes: Record<string, string> = {
   meteor: '流星轨迹反向延长后交汇于辐射点。',
   eclipse: '月球本影锥与日冕为示意；全食时日冕可见。',
   aurora: '极光颜色按海拔分层：低层蓝紫（氮）、中层绿（氧）、高层红（氧）。',
-  supernova: '示意核坍缩抛射物，中心遗留中子星遗迹。'
+  supernova: '示意核坍缩抛射物，中心遗留中子星遗迹。',
+  pulsar: '中子星直径按真实量级示意（约 20 km）；射束与磁力线为艺术化表现，自转与脉冲节奏已放慢到肉眼可读。',
+  asteroid: '轨道半径与倾角按真实分布抽样，小行星直径与间距非真实比例（真实平均间距约 100 万千米）。',
+  exoplanet: '以 TRAPPIST-1 为原型：恒星与七颗行星的相对大小按真实比例，行星间距为便于观看做了压缩。'
 }
 
 const TAB_KEY_TO_ID: readonly DetailTab[] = TAB_LIST.map((t) => t.id)
