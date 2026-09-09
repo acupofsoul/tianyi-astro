@@ -6,6 +6,7 @@ import './styles/viewer.css'
 import './styles/detail.css'
 import './styles/ux.css'
 import './styles/perf.css'
+import './styles/scale.css'
 import { startRouter } from './ui/router'
 import { installDetailPrefetch } from './ui/prefetch'
 

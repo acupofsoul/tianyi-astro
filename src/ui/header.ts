@@ -31,13 +31,14 @@ export interface SiteHeaderOptions {
   breadcrumb?: BreadcrumbInput
 }
 
-type PageKey = 'home' | 'browse' | 'timeline' | 'detail'
+type PageKey = 'home' | 'browse' | 'timeline' | 'detail' | 'scale'
 
 function currentPageKey(): PageKey {
   const hash = location.hash
   if (hash.startsWith('#/p/')) return 'detail'
   if (hash.startsWith('#/browse')) return 'browse'
   if (hash.startsWith('#/timeline')) return 'timeline'
+  if (hash.startsWith('#/scale')) return 'scale'
   return 'home'
 }
 
@@ -83,6 +84,7 @@ export function renderSiteHeader(opts?: SiteHeaderOptions): HTMLElement {
     <a href="#/" class="brand${page === 'home' ? ' active' : ''}"${page === 'home' ? ' aria-current="page"' : ''}>知天易</a>
     <nav class="main-nav" aria-label="主导航">
       <a href="#/browse" class="nav-link">目录</a>
+      <a href="#/scale" class="nav-link">比例尺</a>
       <a href="#/timeline" class="nav-link">天文史</a>
     </nav>
     <nav class="crumbs" id="header-crumbs" aria-label="面包屑"></nav>
@@ -97,6 +99,7 @@ export function renderSiteHeader(opts?: SiteHeaderOptions): HTMLElement {
         <a href="#/" class="drawer-link">首页</a>
         <a href="#/p/solar-system" class="drawer-link">正片 · 从太阳系开始</a>
         <a href="#/browse" class="drawer-link">展品目录</a>
+        <a href="#/scale" class="drawer-link">真实比例对比</a>
         <a href="#/timeline" class="drawer-link">天文史</a>
       </nav>
       <div class="drawer-groups" id="drawer-groups"></div>
@@ -160,7 +163,11 @@ export function renderSiteHeader(opts?: SiteHeaderOptions): HTMLElement {
   })
 
   // 当前页高亮
-  const navTargets: Record<string, PageKey> = { '#/browse': 'browse', '#/timeline': 'timeline' }
+  const navTargets: Record<string, PageKey> = {
+    '#/browse': 'browse',
+    '#/timeline': 'timeline',
+    '#/scale': 'scale'
+  }
   header.querySelectorAll<HTMLAnchorElement>('.main-nav a').forEach((link) => {
     const href = link.getAttribute('href') ?? ''
     const key = navTargets[href]
@@ -174,7 +181,8 @@ export function renderSiteHeader(opts?: SiteHeaderOptions): HTMLElement {
     const active =
       (href === '#/' && page === 'home') ||
       (href === '#/browse' && (page === 'browse' || page === 'detail')) ||
-      (href === '#/timeline' && page === 'timeline')
+      (href === '#/timeline' && page === 'timeline') ||
+      (href === '#/scale' && page === 'scale')
     if (active) {
       link.classList.add('active')
       link.setAttribute('aria-current', 'page')

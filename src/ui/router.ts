@@ -7,6 +7,7 @@ export type Route =
   | { page: 'detail'; id: string }
   | { page: 'browse'; browse: BrowseRoute }
   | { page: 'timeline' }
+  | { page: 'scale' }
 
 function decodeParam(v: string | undefined): string {
   if (!v) return ''
@@ -33,6 +34,7 @@ export function parseRoute(): Route {
     }
   }
   if (h.startsWith('#/timeline')) return { page: 'timeline' }
+  if (h.startsWith('#/scale')) return { page: 'scale' }
   return { page: 'home' }
 }
 
@@ -46,6 +48,36 @@ export function registerCleanup(fn: () => void) {
 export function runCleanup() {
   cleanup?.()
   cleanup = null
+}
+
+const CHUNK_RELOAD_KEY = 'tianyi:chunk-reload'
+
+/**
+ * 判断是否为「按需 chunk 拉取失败」。
+ * 典型场景：站点重新部署后，旧标签页里的 index.html 仍指向已被替换的
+ * 哈希文件名，此时再切路由就会 404。这类错误重载一次页面即可恢复。
+ */
+function isChunkLoadError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err)
+  return /dynamically imported module|Importing a module script failed|Loading chunk|Failed to fetch/i.test(msg)
+}
+
+function markChunkReload(): boolean {
+  try {
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return false
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
+    return true
+  } catch {
+    return false
+  }
+}
+
+function clearChunkReload(): void {
+  try {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+  } catch {
+    /* 隐私模式下忽略 */
+  }
 }
 
 /**
@@ -97,6 +129,10 @@ export function startRouter(root: HTMLElement) {
         const mod = await import('./browse')
         if (token !== renderToken) return
         mod.renderBrowse(root, route.browse)
+      } else if (route.page === 'scale') {
+        const mod = await import('./scale')
+        if (token !== renderToken) return
+        mod.renderScalePage(root)
       } else {
         const mod = await import('./timeline')
         if (token !== renderToken) return
@@ -105,11 +141,20 @@ export function startRouter(root: HTMLElement) {
       window.scrollTo(0, 0)
     }
 
-    void load().catch((err: unknown) => {
-      if (token !== renderToken) return
-      console.error('[router] 页面加载失败', err)
-      renderRouteError(root, err)
-    })
+    void load()
+      .then(() => {
+        if (token === renderToken) clearChunkReload()
+      })
+      .catch((err: unknown) => {
+        if (token !== renderToken) return
+        console.error('[router] 页面加载失败', err)
+        // 部署后旧标签页的 chunk 已失效：自动重载一次，避免用户看到错误页
+        if (isChunkLoadError(err) && markChunkReload()) {
+          location.reload()
+          return
+        }
+        renderRouteError(root, err)
+      })
   }
 
   window.addEventListener('hashchange', render)

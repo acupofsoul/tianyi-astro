@@ -1949,6 +1949,120 @@ export function buildExoplanetScene(): SceneHandle {
   )
 }
 
+// ------------------------------------------------------------ 尺度对比 --
+export type ScaleLineupMode = 'log' | 'true'
+
+export interface ScaleLineupBody {
+  name: string
+  diameterKm: number
+  color: string
+  row: number
+}
+
+const SUN_DIAMETER_KM = 1392700
+const LOG_MIN = Math.log10(20)
+const LOG_MAX = Math.log10(SUN_DIAMETER_KM)
+
+/**
+ * 把真实直径映射为场景半径。
+ * - 'true'：真实比例，太阳 = 1.05 世界单位半径，其余按比例缩到肉眼难见的尺寸；
+ * - 'log'：对数比例，让 20 km 的中子星和 139 万 km 的太阳同时可见。
+ */
+function scaleRadius(diameterKm: number, mode: ScaleLineupMode): number {
+  if (mode === 'true') return (diameterKm / SUN_DIAMETER_KM) * 1.05
+  const t = (Math.log10(diameterKm) - LOG_MIN) / (LOG_MAX - LOG_MIN)
+  return 0.1 + Math.max(0, Math.min(1, t)) * 0.95
+}
+
+/**
+ * 真实比例 / 对数比例的天体排排站。
+ * 每行按真实直径排序后居中排列，间距固定；真实比例下太阳会吞掉整行，
+ * 小天体只剩几个像素 —— 这个落差本身就是要展示的内容。
+ */
+export function buildScaleLineupScene(
+  bodies: ScaleLineupBody[],
+  mode: ScaleLineupMode
+): SceneHandle {
+  const group = new THREE.Group()
+  group.add(makeStarfield(900))
+
+  const rowIndexes = Array.from(new Set(bodies.map((b) => b.row))).sort((a, b) => a - b)
+  const rowGap = mode === 'log' ? 0.52 : 0.3
+  const rowY = (row: number, total: number) => ((total - 1) / 2 - row) * 2.6
+  const anchors: SceneLabelAnchor[] = []
+  let maxHalfWidth = 0
+
+  for (const row of rowIndexes) {
+    const list = bodies.filter((b) => b.row === row).sort((a, b) => b.diameterKm - a.diameterKm)
+    const radii = list.map((b) => scaleRadius(b.diameterKm, mode))
+    const width = radii.reduce((sum, r) => sum + r * 2, 0) + rowGap * (list.length - 1)
+    const y = rowY(row, rowIndexes.length)
+    maxHalfWidth = Math.max(maxHalfWidth, width / 2)
+
+    // 基线
+    group.add(
+      new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-width / 2, y, 0),
+          new THREE.Vector3(width / 2, y, 0)
+        ]),
+        new THREE.LineBasicMaterial({ color: 0x5fd6ff, transparent: true, opacity: 0.16 })
+      )
+    )
+
+    let x = -width / 2
+    list.forEach((body, i) => {
+      const r = radii[i]
+      x += r
+      const isStar = body.diameterKm >= SUN_DIAMETER_KM * 0.5
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(r, 48, 32),
+        isStar
+          ? new THREE.MeshBasicMaterial({ color: new THREE.Color(body.color) })
+          : new THREE.MeshStandardMaterial({ color: new THREE.Color(body.color), roughness: 0.86, metalness: 0 })
+      )
+      mesh.position.set(x, y, 0)
+      markPick(mesh, body.name)
+      group.add(mesh)
+      if (isStar) group.add(makeGlowSprite(body.color, r * 4.2, 0.35).translateY(y))
+
+      // 相邻标签上下交错，避免密集排布时互相压住
+      const labelY = y + (i % 2 === 0 ? -r - 0.3 : r + 0.3)
+      anchors.push({ name: body.name, position: [x, labelY, 0] })
+      x += r + rowGap
+    })
+  }
+
+  const cameraZ = mode === 'log' ? Math.max(11, maxHalfWidth * 1.85) : 4.6
+
+  const handle = decorateScene(
+    {
+      group,
+      camera: { position: [0, 0, cameraZ] },
+      autoRotate: false,
+      minDistance: 1.2,
+      maxDistance: cameraZ * 4,
+      subjectRadius: maxHalfWidth,
+      boundsRadius: cameraZ,
+      labelAnchors: anchors,
+      scaleRef: {
+        radius: scaleRadius(SUN_DIAMETER_KM, mode),
+        label:
+          mode === 'true'
+            ? '真实比例：太阳半径 = 1.05 世界单位，其余天体按真实直径等比缩小'
+            : '对数比例：半径按 log₁₀(直径) 映射，20 km 的中子星与太阳可同框',
+        position: [0, -3.4, 0]
+      }
+    },
+    'planet'
+  )
+
+  // 15 个天体挤在一行，标签必然互相压字 —— 这里不用三维标签，
+  // 改为「点击拾取 + 右侧色点列表」来识别（色点颜色与球体颜色一一对应）。
+  // 标签图层仍然保留在 handle.overlays 里，需要时可用 Viewer.setOverlay 打开。
+  return handle
+}
+
 export function buildSolarSystemScene(): SceneHandle {
   const group = new THREE.Group()
   const rng = mulberry32(1234)

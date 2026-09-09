@@ -240,6 +240,9 @@ export function updateLabelScales(
   viewportHeight: number
 ): void {
   if (!group) return
+  // 注意：标签材质是 sizeAttenuation:false，three 的 sprite 着色器会把缩放
+  // 再乘以视空间深度，因此屏幕尺寸本身就与距离无关 —— 这里不能再乘距离，
+  // 否则标签会随距离线性膨胀成一片白条。
   const f = 1 / Math.tan((camera.fov * Math.PI) / 360)
   const h = Math.max(1, viewportHeight)
   group.traverse((obj) => {
